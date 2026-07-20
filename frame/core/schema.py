@@ -231,6 +231,15 @@ class Metrics:
     def mrr_unfiltered(self) -> float:
         return _safe_mean([m.rr_unfiltered for m in self._scorable()])
 
+    # Latency is a system property independent of scorability, so it is summarised
+    # over ALL items (a filtered search still has a real cost when the target fails
+    # its own filter). Median over the per-query medians the Runner recorded.
+    def median_latency_filtered(self) -> float:
+        return _median([m.latency_filtered_ms for m in self.per_query])
+
+    def median_latency_unfiltered(self) -> float:
+        return _median([m.latency_unfiltered_ms for m in self.per_query])
+
     def write_jsonl(self, path: str) -> None:
         with open(path, "w") as f:
             f.write(json.dumps({"system": self.system, "ks": list(self.ks)}) + "\n")
@@ -241,3 +250,12 @@ class Metrics:
 def _safe_mean(xs: Iterable[float]) -> float:
     xs = list(xs)
     return sum(xs) / len(xs) if xs else 0.0
+
+
+def _median(xs: Iterable[float]) -> float:
+    xs = sorted(xs)
+    n = len(xs)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2.0

@@ -86,6 +86,10 @@ class Analyzer:
             f"MRR  filtered: {m.mrr_filtered():.3f}   "
             f"no-filter: {m.mrr_unfiltered():.3f}   "
             f"(Δ = {m.mrr_filtered() - m.mrr_unfiltered():+.3f})",
+            "",
+            f"median latency  filtered: {m.median_latency_filtered():8.1f} ms   "
+            f"no-filter: {m.median_latency_unfiltered():8.1f} ms   "
+            f"(all {n} items, warm)",
         ]
         return "\n".join(lines)
 

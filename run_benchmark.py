@@ -51,6 +51,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--system", default="pgvector", choices=sorted(ADAPTERS))
     ap.add_argument("--k", type=int, default=1000)
+    ap.add_argument("--warmup", type=int, default=1,
+                    help="untimed passes per search to prime plan cache + buffers")
+    ap.add_argument("--repeat", type=int, default=5,
+                    help="timed passes per search; latency reported as their median")
     ap.add_argument("--bench", default=os.path.join(DATA, "benchmark.jsonl"))
     ap.add_argument("--explain", metavar="QID",
                     help="diagnostic: EXPLAIN the filtered search for one query "
@@ -68,7 +72,8 @@ def main():
         return
 
     with adapter:
-        raw = Runner(adapter, encoder).run(items, k=args.k)
+        raw = Runner(adapter, encoder,
+                     warmup=args.warmup, repeat=args.repeat).run(items, k=args.k)
 
     raw_path = os.path.join(DATA, f"raw_results.{args.system}.jsonl")
     raw.write_jsonl(raw_path)
