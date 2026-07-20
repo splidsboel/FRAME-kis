@@ -44,10 +44,22 @@ _LABEL_SOURCES = {
 class PgvectorAdapter(VectorDBAdapter):
     name = "pgvector"
 
-    def __init__(self, dsn: str | None = None, ef_search: int = 400):
+    def __init__(
+        self,
+        dsn: str | None = None,
+        ef_search: int = 1000,
+        iterative_scan: str = "relaxed_order",
+    ):
         # dsn=None -> libpq reads PG* env vars (PGHOST socket dir on the HPC).
+        # ef_search is capped at 1000 by pgvector and must be >= the run's k;
+        # for a top-1000 run it is pinned at the ceiling (=k, no recall headroom).
+        # iterative_scan lets a FILTERED search keep pulling candidates from the
+        # HNSW index when the predicate prunes them, instead of the planner
+        # falling back to a sequential scan (exact but slow). Modes: 'off',
+        # 'relaxed_order', 'strict_order'.
         self.dsn = dsn
         self.ef_search = ef_search
+        self.iterative_scan = iterative_scan
         self._conn = None
 
     def setup(self) -> None:
@@ -56,8 +68,9 @@ class PgvectorAdapter(VectorDBAdapter):
         self._conn = psycopg2.connect(self.dsn) if self.dsn else psycopg2.connect()
         self._conn.autocommit = True
         with self._conn.cursor() as cur:
-            # HNSW search-time recall knob; set per session.
+            # HNSW search-time knobs; set per session.
             cur.execute("SET hnsw.ef_search = %s;", (self.ef_search,))
+            cur.execute("SET hnsw.iterative_scan = %s;", (self.iterative_scan,))
             # Sanity: the vector index we rely on must exist.
             cur.execute("SELECT to_regclass('public.keyframes_embedding_hnsw_idx');")
             row = cur.fetchone()
@@ -76,19 +89,41 @@ class PgvectorAdapter(VectorDBAdapter):
         k: int,
     ) -> list[str]:
         assert self._conn is not None, "call setup() first"
-        where_sql, params = self._build_filters(filters)
+        sql, params = self._search_sql(filters)
         vec_literal = "[" + ",".join(f"{x:.8f}" for x in query_vector.tolist()) + "]"
-
-        sql = (
-            "SELECT k.keyframe_id "
-            "FROM keyframes k "
-            f"{where_sql} "
-            "ORDER BY k.embedding <=> %s::vector "
-            "LIMIT %s"
-        )
         with self._conn.cursor() as cur:
             cur.execute(sql, (*params, vec_literal, k))
             return [row[0] for row in cur.fetchall()]
+
+    def _search_sql(self, filters: Sequence[Predicate]) -> tuple[str, list]:
+        where_sql, params = self._build_filters(filters)
+        sql = (
+            "SELECT k.keyframe_id FROM keyframes k "
+            f"{where_sql} ORDER BY k.embedding <=> %s::vector LIMIT %s"
+        )
+        return sql, params
+
+    def explain(
+        self,
+        query_vector: np.ndarray,
+        filters: Sequence[Predicate],
+        k: int,
+        iterative_scan: str | None = None,
+    ) -> str:
+        """Run EXPLAIN (ANALYZE, BUFFERS) on the exact SQL search() would run, under
+        a chosen iterative_scan mode. Diagnostic — confirms whether a filtered query
+        uses the HNSW index or falls back to a sequential scan."""
+        assert self._conn is not None, "call setup() first"
+        sql, params = self._search_sql(filters)
+        vec_literal = "[" + ",".join(f"{x:.8f}" for x in query_vector.tolist()) + "]"
+        mode = iterative_scan or self.iterative_scan
+        with self._conn.cursor() as cur:
+            cur.execute("SET hnsw.iterative_scan = %s;", (mode,))
+            cur.execute("EXPLAIN (ANALYZE, BUFFERS) " + sql, (*params, vec_literal, k))
+            plan = "\n".join(r[0] for r in cur.fetchall())
+            # restore the adapter's configured mode
+            cur.execute("SET hnsw.iterative_scan = %s;", (self.iterative_scan,))
+        return plan
 
     # ── predicate translation (system-under-test side) ──
     def _build_filters(self, filters: Sequence[Predicate]) -> tuple[str, list]:

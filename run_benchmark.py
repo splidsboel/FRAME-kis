@@ -28,11 +28,33 @@ ADAPTERS = {
 }
 
 
+def explain_one(adapter, encoder, items, qid, k):
+    """Confirm whether a filtered search uses the HNSW index or a seqscan, and
+    whether iterative_scan flips it. Only pgvector supports .explain()."""
+    item = next((it for it in items if it.query_id == qid), None)
+    if item is None:
+        raise SystemExit(f"no such query_id: {qid}")
+    if not item.filters:
+        raise SystemExit(f"{qid} has no filters — nothing to explain")
+    if not hasattr(adapter, "explain"):
+        raise SystemExit(f"{adapter.name} adapter has no explain()")
+
+    vec = encoder.encode(item.vector_query)
+    with adapter:
+        for mode in ("off", "relaxed_order"):
+            print(f"\n{'='*70}\n{qid}  filters={len(item.filters)}  "
+                  f"k={k}  hnsw.iterative_scan={mode}\n{'='*70}")
+            print(adapter.explain(vec, item.filters, k, iterative_scan=mode))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--system", default="pgvector", choices=sorted(ADAPTERS))
     ap.add_argument("--k", type=int, default=1000)
     ap.add_argument("--bench", default=os.path.join(DATA, "benchmark.jsonl"))
+    ap.add_argument("--explain", metavar="QID",
+                    help="diagnostic: EXPLAIN the filtered search for one query "
+                         "under iterative_scan off vs relaxed_order, then exit")
     args = ap.parse_args()
 
     items = load_query_set(args.bench)
@@ -40,6 +62,10 @@ def main():
 
     encoder = CachingEncoder(SiglipEncoder())
     adapter = ADAPTERS[args.system]()
+
+    if args.explain:
+        explain_one(adapter, encoder, items, args.explain, args.k)
+        return
 
     with adapter:
         raw = Runner(adapter, encoder).run(items, k=args.k)
