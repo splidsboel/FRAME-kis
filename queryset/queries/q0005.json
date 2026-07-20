@@ -1,0 +1,350 @@
+{
+  "query_id": "q0005",
+  "status": "verified",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kis-c5",
+    "task_type": "KIS-C",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a woman standing in a dark room reading a book on a desk, with unlit candles around her",
+  "decomposition": {
+    "vector_query": "woman reading a book at a desk",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "book",
+          "candle"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "03081",
+    "start_s": 54.98,
+    "end_s": 60.74
+  },
+  "user_query_variants": [
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "woman reading a book on desk candles"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman reading book on desk with unlit candles"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman standing in a dark room with not burning candle"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman in a dark room with unlit candles reading a book"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "woman reading on a book that lays on a desk. around here are candles that are not lit"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman standing in a dark room and reading a book with not burning candle"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "woman standing in a dark room  reading a book on a desk, candles not burning around her"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "age"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman in a dark room reading a book on a desk"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "woman standing in a dark room  reading a book on a desk, candles not burning around her"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman standing in a dark room and reading a book with many candles not burning"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman reading book on desk with unlit candles church"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a woman reading a book on a table. she is in a church"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "woman in church reading book table"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman in a dark church room reading a book on a desk"
+    },
+    {
+      "team": "prak5",
+      "action": "temporalQuery",
+      "text": "['woman standing in a dark room  reading a book on a desk, candles not burning around her', 'church']"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Woman back in a church candles around"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church standing in a dark room and reading a book with many candles not burning"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "one book on a table read by woman candles on desk"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman in church reading book on desk with unlit candles"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "young woman in a dark church reading a book on a desk"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a woman is reading a book that lays on a table. she is in a church. there are a lot of candles around her"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "woman reading book on desk with candles"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman back in church reading book on desk with unlit candles"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Woman back in a church candles around not burning"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "woman reading book church desk candles"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church  reading a book with many candles not burning"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Young woman back in a church candles around"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a woman reading a book in a church"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "unlit candles reading book on table"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman back reading book on desk with unlit candles on wooden bench"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a woman reading a book in a church. there are a lot of candles around here that are not burning"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman back reading book on desk with unlit on wooden bench"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church  reading a book from behind"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Young woman back in a church candles around, dark inside scene"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman back reading book on desk with unlit on wooden bench church"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church  reading a book from behind rather dark"
+    },
+    {
+      "team": "prak5",
+      "action": "temporalQuery",
+      "text": "['Young woman back in a church candles around, dark inside scene', 'book on a table']"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Young woman back in a church candles around, dark inside scene"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Young woman with black hair back in a church candles around, dark inside scene"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church  reading a book on a table from behind rather dark"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "woman back book on desk with unlit on church"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman in church  reading a book on a table view from behind rather dark"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a shot of a woman reading a book that is on a table. there are a lot of candles. the person has black hair"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "black hair woman reading book on desk"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman with black hair with something on her back in church  reading a book on a table, view from behind rather dark"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman with white bag in a dark church room reading a book on a desk"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman with black hair with white bag on her back, held by chains in church  reading a book on a table, view from behind rather dark"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "Young woman with black hair and white bag from back in a church candles around, dark inside scene"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "chain desk woman black hair"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "desk chains book woman"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "desk held by chains book woman"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman with white bag in a dark church room reading a book on a desk with chains"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a book laying on a table which is held up by chains"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "chain desk woman black hair"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman reading book in dim church with chains on table"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a book laying on a table which is held up by chains. there is a woman reading the book. there are candles"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "girl black hair reading a book on a desk seen from behind white back"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "woman with long black hair reading book in dim church with chains on table"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "desk sustained on chains"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "desk sustained on chains book"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "woman with white bag in a dark room reading a book on a desk with chains"
+    }
+  ],
+  "notes": "Real VBS2026 KIS-C task, 62 real user query formulations for one V3C1 target. Filterable: object=book/candle, scene=dark/indoor room. Notable characterization signals: NEGATION ('unlit candles', 'not burning' -- 21/62 variants), lighting ('dark room'), and a divergent scene guess ('church') recurring across MANY users. Strong phrasing-variance + negation exemplar. FILTER-HELPS EXEMPLAR (build_gt 2026-07-12, job 99295): object filter is VIABLE -- candle detected on target keyframe 03081_00029 at conf 0.716, so the target passes at any t_object <= 0.716; candle selectivity prunes to 2.7% (t=0.30) / 1.1% (t=0.50) corpus-wide -> filter helps (strong prune while retaining target). object.verified=true. DECOMPOSITION HARM confirmed: raw_query_text ranks target at 873, but the stripped vector_query 'woman reading a book at a desk' ranks it at 59450 (68x worse). Cross-link to q0003: users repeatedly typed 'church' for this dark non-church interior (taxonomy-semantic divergence in the users' own words), yet the OBJECT signal (candle) rescues the target where a hard church/* SCENE filter would have excluded it -- the mirror image of q0003/q0004."
+}

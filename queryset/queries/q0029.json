@@ -1,0 +1,132 @@
+{
+  "query_id": "q0029",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-13",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a shirtless person behind you can see a wall with black and white stripes",
+  "decomposition": {
+    "vector_query": "a shirtless person in front of a wall with black and white stripes",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "02034",
+    "start_s": 38.0,
+    "end_s": 57.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a shirtless person behind you can see a wall with black and white stripes"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a wedding scene"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing girl has a light blue bandana on her head and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a shirtless man"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "shirtless man who is dressing the back wall in black and white stripes"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "shirtless man who is dressing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing girl has a light blue foulard on her head and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride who wears white"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing girl has foulard on her hair and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing blonde girl has foulard on her hair and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing blonde girl has foulard on her bond hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a laughing girl has foulard on her bond hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman with a headband crying"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride who dresses herself white"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man undressing"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "we were younng we"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "shes the one"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man getting dressed"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "we were young"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "naked man getting dressed"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "shelter"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-13, 21 real user phrasings (visione+vitrivr-vr) for one V3C1 target. Filters: none (semantic-only). semantic-only: the distinctive striped wall is neither a vocab object nor a places365 scene. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

@@ -1,0 +1,137 @@
+{
+  "query_id": "q0028",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-11",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "image from a plane you can see the red light and all the lights of a city",
+  "decomposition": {
+    "vector_query": "an aerial view of a city at night with its lights, filmed from a plane",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "06979",
+    "start_s": 122.0,
+    "end_s": 139.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "city in night fron the air"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "city at night from the air"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "city at night from airplane"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "image from a plane you can see the red light and all the lights of a city"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "airplane images of a city lit up at night"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "aerial view of a city illuminated at night"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "image from a plane you can see the red wing and all the lights of a city"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "airplane image of a city at night you see many lights"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "aerial view of a city illuminated at night from the top"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "light night city"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "airplane city by night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "fuel"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "less fuel per hour"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "city at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "city at night from above"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "fuel per hour"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "glowing orange horizon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "red airplane engine from cabin at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "red airplane engine at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "city at night from an airplane"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "rcityscape from airplane at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "city from airplane at night"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-11, 22 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: none (semantic-only). semantic-only POV: the plane is out of frame; no confident night-city scene label. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

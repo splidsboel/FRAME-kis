@@ -1,0 +1,180 @@
+{
+  "query_id": "q0014",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-10",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a man in profile with a cell phone in his hand and a hat at the bottom, there are two people sitting viewed from behind",
+  "decomposition": {
+    "vector_query": "a man in profile holding a mobile phone, wearing a hat",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "hat",
+          "mobile phone"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "04225",
+    "start_s": 131.0,
+    "end_s": 144.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man in his hand with his cellphone in his hand and a hat"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man with a hat and two women from behind"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man with a hat behind you see a projector"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man near a white poster with text"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man from behind behind him there are writings on a sheet with a projector in the foreground there is a woman"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man from behind behind him there are writings with a projector in the foreground there is a woman"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man from behind behind him there are writings on a projector in the foreground there is a woman"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man in profile with a cell phone in his hand and a hat at the bottom, there are two people sitting back to back"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man in profile with a cell phone in his hand and a hat at the bottom, there are two people sitting viewed from behind"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "two women sitting back to back with a hat and a man using a cellphone next to a towel"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man phone creen"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man phone screen"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man phone screen with a screen"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man seen from behind behind him there are writings projected on a tarpaulin"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man phone and women screen with a screen"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man seen from behind behind him there are writings projected on a screen"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "working group"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman sitting in front of screen"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman sitting in front of screen at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman holding a presentation"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman sitting in front of text screen at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a man looking at his phone at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman speaking in  front of screen"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "sitting woman speaking in  front of screen"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "projector screen at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "meditation working group"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "projector screen outdoors at night"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "kel c"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-10, 28 real user phrasings (visione+vitrivr-vr) for one V3C1 target. Filters: object=['hat', 'mobile phone'].  Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

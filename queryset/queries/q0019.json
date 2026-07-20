@@ -1,0 +1,150 @@
+{
+  "query_id": "q0019",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-14",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a boy with a yellow skateboard by hand climbing the escalators",
+  "decomposition": {
+    "vector_query": "a boy carrying a yellow skateboard going up an escalator",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "escalator/indoor",
+          "subway_station/platform"
+        ],
+        "vocab": "places365",
+        "mapping_source": "target-inspection",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "02519",
+    "start_s": 24.0,
+    "end_s": 39.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "holding skates"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "holding skateboard"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "man with red vest"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a boy with a skateboard by hand climbing the escalators"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a boy with a yellow skateboard by hand climbing the escalators"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "several people on an escalator"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "close-up of some airline tickets"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "airline tickets in foreground"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man in a red coat"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an asian guy in a red vest at an airport"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "brock"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "skateboard carried"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "subway doors close"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "delta"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "klm"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "real skate"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man in a red shirt"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boardding at the airport"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man in red at airport"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "ticket"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boarding at the airport"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boarding at the airport screen"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS v21-14, 22 real phrasings. FIXED via target inspection: real scene is escalator/indoor@0.87-0.96 (my subway guess was @0.03); query literally says 'climbing the escalators'. Yellow skateboard never detected -> object arm dropped. Scene-only, expected to pass."
+}

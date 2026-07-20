@@ -1,0 +1,146 @@
+{
+  "query_id": "q0011",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "t21-5",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a black car approaching and stopping the left wheel in focus, the rest blurred",
+  "decomposition": {
+    "vector_query": "a black car approaching and stopping, its left wheel in sharp focus",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "car",
+          "truck",
+          "wheel"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "07421",
+    "start_s": 32.0,
+    "end_s": 49.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black car approaching and stopping"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man in the car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black car approaching and stopping"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black car approaching and stopping the left wheel in focus, the rest blurred"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black car stopping"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man in the car baseball cap and a jacket"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man wearing a baseball cap and and a jacket in the car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black car approaching"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man wearing a baseball cap inside the car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "man inside a car baseball cap and a jacket"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man wearing a baseball hat and a jacket inside a car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black car approaching and stopping from ground level"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black car approaching and stoping"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black car coming toards mes and stopping"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "the wheel of a black car"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black car coming toards me and stops"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "close up of a man in a baseball cap"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black car drives towards me and stops"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "close up of a man in a baseball cap in a car"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "close up of a man in a baseball cap and a jacket"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS t21-5, 21 real phrasings. FIXED via target inspection: the black car is detected more strongly as truck@0.37 than car@0.18 (car/truck detector confusion), so the object predicate was relaxed to a vehicle set {car,truck,wheel}. Passes at t=0.30 via truck."
+}

@@ -1,0 +1,22 @@
+# Generated artifacts — regenerate via queryset/build.py + oracle/build_gt.py
+data/*.jsonl
+
+# SLURM job output
+*.out
+slurm-*.out
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# uv / venv  (uv.lock IS committed — reproducible installs)
+.venv/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/

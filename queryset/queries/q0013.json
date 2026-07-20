@@ -1,0 +1,165 @@
+{
+  "query_id": "q0013",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-20",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "two people dressed in white shake your hand. large crystal chandelier",
+  "decomposition": {
+    "vector_query": "a bride descending a marble staircase under a large crystal chandelier",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "chandelier",
+          "staircase"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "06827",
+    "start_s": 189.0,
+    "end_s": 204.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "chandelier"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "chandelier and staircase"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride going down the marble stairs"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride comes down the stairs"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "some men in gray suit greeting each other"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "two people dressed in white shake your hand"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a smiling bride going down the marble stairs"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "two people dressed in white shake your hand. large crystal chandelier"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a smiling shopping bag"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "seen from the top of some marble stairs you can see a chandelier"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a smiling bride"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "some people in a large room with a stair railing a chandelier"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride coming down the stairs"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride between two columns"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "marble stairs and a chandelier"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "sea with waves"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a bride between two columns is a railing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "chandelier stair bride"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "of the marble stairs with a black railing is a chandelier"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "chandelier from above"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "chandeleir in  the staircase"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "white bride on a staircase"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "white bride smiling on a staircase"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "chandeleir and bride in  staircase"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "closeup of smiling bride"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS v21-20, 25 real phrasings. BELOW-THRESHOLD EXEMPLAR (target inspection): chandelier is detected at 0.251, just under t_object=0.30 (staircase@0.17, itself read as ladder@0.88). A faint-detection case -- would pass at t_object=0.25. Kept to demonstrate threshold sensitivity."
+}

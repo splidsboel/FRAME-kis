@@ -1,0 +1,169 @@
+{
+  "query_id": "q0006",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "t21-1",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a graffity artists wearing a blue jacket over a green hoodie. spraying purple outline of the letters rth, letters are white and green on a wall with a blueish graffity on the left",
+  "decomposition": {
+    "vector_query": "a graffiti artist in a blue jacket and green hoodie spraying purple paint",
+    "filters": [
+      {
+        "filter_type": "pattern-match",
+        "attribute": "ocr_text",
+        "op": "contains",
+        "value": [
+          "rth"
+        ],
+        "vocab": "keyframe_ocr",
+        "mapping_source": "manual",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "03085",
+    "start_s": 314.0,
+    "end_s": 337.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "graffity artist spraying purple"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "graffiti artist with blue jacket"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple outline of the letters rth."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple outline of the letters rth"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists spraying purple outline of the letters rth"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists spraying purple outline of the letters rth, letters are white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists wearing a blue jacket over a green hoodie. spraying purple outline of the letters rth, letters are white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists wearing a blue jacket over a green hoodie, spraying purple outline of the letters rth, letters are white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity the person wears a blue jacket over a green hoodie."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists wearing a blue jacket over a green hoodie, spraying purple outline of the letters rth"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists the person wears a blue jacket over a green hoodie."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "letters are white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffiti with letters are white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffiti with letters white and green on a wall with a blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a graffity artists wearing a blue jacket over a green hoodie"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple. the person wears a blue jacket over a green hoodie."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple outline of the letters"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple outline of the letters whiteand green on a wall"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "blueish graffity on the left"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "graffity artists spraying purple. blueish graffity on the left"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "rth"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "grafitti artisst spraying"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "spray painting"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "grafitti artist spraying  purple"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "spray painting man"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS t21-1, 26 real phrasings. OCR-RECALL HARM EXEMPLAR (target inspection): the graffiti letters 'rth' were never extracted -- EasyOCR read YG/[3/WYo on the target keyframes and the pattern-match filter finds no 'rth', so target_passes=false. The target is rank 1 semantically, so the OCR filter is pure harm. First OCR-filter finding: stylized/artistic text defeats OCR pattern filtering. Kept as a deliberate exemplar."
+}

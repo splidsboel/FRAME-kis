@@ -1,0 +1,64 @@
+{
+  "query_id": "q0010",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-4",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a person with a snowboard that has a phosphorescent green jacket",
+  "decomposition": {
+    "vector_query": "a person snowboarding along a railing in a green jacket",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "snowboard"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "03317",
+    "start_s": 178.0,
+    "end_s": 203.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a person with a snowboard that has a phosphorescent green jacket"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "snowboard green jacket"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a person with a yellow snowboard riding a railing"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a snowboarder"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "mayrhofn"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-4, 5 real user phrasings (visione+vitrivr-vr) for one V3C1 target. Filters: object=['snowboard']. SECOND SNOWBOARD CASE (callback to q0004's object-detector-miss on 00358): tests whether YOLO-World's snowboard miss reproduces on a different target or was instance-specific. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

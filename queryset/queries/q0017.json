@@ -1,0 +1,247 @@
+{
+  "query_id": "q0017",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "t21-2",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a hand opening and closing a window of a mountain hut. there are snow covered mountains outside. the weather is sunny, the shadow of the hut is visible in the snow.",
+  "decomposition": {
+    "vector_query": "a hand opening and closing the window of a mountain hut",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "02224",
+    "start_s": 70.0,
+    "end_s": 78.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "a hand opening a window of a mountain hut"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand of a person that is opening and closing a window of a mountain hut"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a windows in a mountain hut"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut. there are snow covered mountains outside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a windows in a mountain hut and there are snow covered mountains outside."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a windows in a mountain hut and there are snow covered mountains outside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand of a person that is openinga window"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand of a person that is opening a window, there is sow outside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a windows in a mountain hut and there are snow covered mountains outside, the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut. there are snow covered mountains outside. the weather is sunny, the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand of a person that is opening a window, there is snow outside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand of a person that is opening a window, there is snow outside and the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand window of a mountain hut. there are snow covered mountains outside. the weather is sunny, the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand window of a mountain hut. snow covered mountains outside. the weather is sunny, the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut. there are snow covered mountains outside. the weather is sunny, the shadow of the hut is visible in the snow."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand window of a mountain hut. snow covered mountains outside. sunny"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening and closing a window of a mountain hut, there are snow covered mountains outside."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "the weather is sunny, the shadow of the hut is visible in the snow."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a person near window of a mountain hut. snow covered mountains outside. sunny"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "hut snow mountains"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "the weather is sunny, the shadow of the hut is visible in the snow"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a person near a window. snow covered mountains outside. sunny"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand near a window. snow covered mountains outside. sunny"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a hand opening a window of a mountain hut, there are snow covered mountains outside."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "hut snow hands"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "there are snow covered mountains"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a hand closing a window in the moiuntains"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "hand opening and closeingf window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "hand opening and closeing window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "opening and closeing window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a window in the mountains"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "mountain through window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "hand, mountain"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "hand, mountain, window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "opening window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a hand closing  the window to a mountain"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a snowy mountain  througha window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a snowy mountain  through a window"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "lookin out the window at mountains"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a snowy mountain hut"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "looking out the window at mountains"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "the shadow of a house in the snow"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS t21-2, 44 real phrasings. DEMOTED to semantic-only via target inspection: the single target keyframe is a sky@0.49/glacier view with skis@0.51 -- keyframe sampling missed the indoor 'hand opening the window' moment, so neither window nor mountain_snowy/snowfield is present."
+}

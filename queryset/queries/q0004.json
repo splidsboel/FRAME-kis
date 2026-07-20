@@ -1,0 +1,329 @@
+{
+  "query_id": "q0004",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kis-c1",
+    "task_type": "KIS-C",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a man with a green jacket and a black helmet snowboarding down a street towards a house",
+  "decomposition": {
+    "vector_query": "man snowboarding",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "snowboard"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "00358",
+    "start_s": 78.84,
+    "end_s": 84.6
+  },
+  "user_query_variants": [
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man outside snowboard on street"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snowboard on the street green jack"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket driving snow"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "there is a man outside driving outside on his snowbard. he is driving towards a house. he has a greenish jacket. next to the house there is a gray car"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket driving snowboard big car"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket driving snowboard house"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "man driving on snowboard with green jacket through a gate"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snowboard green jacket on the street"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man on snowboard with camera driving to his hous"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket snowboard house"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man on snowboard with camera on a stick behind him driving to his hous"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a green jacket and a black helmet snowboarding"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snowboarder holdign camera green jacket black helmet"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket on snowboard with camera on a stick behind him driving to his house"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket snowboard house black helmet"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside snowboard on street"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snowboarder holdign camera green jacket black helmet in the street"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside snowboard entering large gate on street"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man green jacket snowboard house black helmet, large gate"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside snowboard entering large gate"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket on snowboard with stick camera behind his back driving to his house"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "man driving on snowboard with green jacket through a gate holding camera on a stick"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "man driving on a street on snowboard with green jacket through a gate holding camera on a stick"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket entering gate"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket on snowboard with stick camera behind his back driving to his house entering a gate"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "man with green jacket and black helmet snowboarding"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket snowboard entering a gate"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket snowboard entering a gate"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man entering gate on snowboard"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside riding snowboard entering large gate"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "riding snowboard in the street black helmet"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "riding snowboard in the street black helmet"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man entering gate on snowboard green jacket"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside riding snowboard on street entering large gate"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black helmet and green jacket outside riding snowboard on street entering large gate"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "riding snowboard in the street black helmet backpack"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket on snowboard with stick camera behind his back driving to his house entering a gate"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man entering gate on snowboard green jacket backpack"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket and red backpack on snowboard with stick camera behind his back driving on a street entering a gate"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with red backpack and black helmet and green jacket outside riding snowboard on street entering large gate"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "man driving on a street on snowboard with green jacket and red backpack through a gate holding camera on a stick"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a black helmet and a gray jacket and a red backpack"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a black helmet and a gray jacket and a red backpack snowboarding"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with red backpack and black helmet and green jacket outside riding snowboard"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a black helmet and a green jacket and a red backpack snowboarding"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket red backpack large metal gate"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with red backpack and black helmet and green jacket outside riding snowboard on street"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket red backpack large metal gate"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man entering big gate of house on snowboard green jacket backpack"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with red backpack and green jacket outside riding snowboard on street"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a black helmet and a green jacket and a red backpack. he is snowboarding. there is a house and a vehicle"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "man with green jacket and red backpack on snowboard with stick camera behind his back driving on a street entering a gate with a car"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with backpack and green jacket outside riding snowboard on street"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket snowboard from behind view camera stick"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "green jacket snowboard from behind view camera stick"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a green jacket and a black helmet going through a gate on a snowboard"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man with a green jacket and a black helmet going through a gate on a snowboard. there is a house in the background"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with backpack and green jacket outside riding snowboard on street pants not visible"
+    }
+  ],
+  "notes": "Real VBS2026 KIS-C task, 58 real user query formulations (5 PraK users + Exquisitor) for one V3C1 target. Filterable signals: object=snowboard, scene=snow/street/outdoor. Also present but not currently filterable: color (green jacket), person (man), object (car, gate, house). Phrasing-variance case: same GT, many real phrasings -> measure recall@k spread under filtering. OBJECT-DETECTOR-MISS HARM EXEMPLAR (build_gt 2026-07-12, job 99295): the object=snowboard filter is HARMFUL -- YOLO-World detects NO snowboard on the target keyframes (00358_00058/59/60), target_best_match conf=0.0, so target_passes_filter=false and filtered recall@k=0 at every threshold, even though snowboard fires elsewhere in the corpus (selectivity 0.79% at t=0.30). This is a NEW failure mode distinct from q0003: q0003 = scene-taxonomy divergence (correct scene, wrong Places365 category); q0004 = OBJECT-DETECTOR RECALL MISS (correct object label, detector simply fails to fire on the target instance). Same outcome (recall@k=0), different mechanism. DECOMPOSITION HARM confirmed and extreme: raw_query_text ranks target at 20, but stripped vector_query 'man snowboarding' ranks it at 10154 (508x worse). OPEN: verify whether the snowboard is actually visible in target keyframes 00358_00058/59/60 -- if visible -> clean detector-miss exemplar (object.verified can flip true); if the keyframes are a POV shot with the board out of frame -> it is instead a keyframe-sampling artifact. object.verified stays false until this is checked."
+}

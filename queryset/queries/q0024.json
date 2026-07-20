@@ -1,0 +1,89 @@
+{
+  "query_id": "q0024",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-18",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "an outdoor motocross track in the countryside seen from above",
+  "decomposition": {
+    "vector_query": "an aerial view of an outdoor motocross track in the countryside",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "motorcycle"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "05531",
+    "start_s": 74.0,
+    "end_s": 87.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "motocross"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a motorcycle jumping in the countryside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a motocross track seen from above"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a motocross race"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a motorcross jumping in the countryside"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an outdoor motocross track in the countryside seen from above"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dirtbike"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "Dirt Bike"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dirt biking people"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "motorcycling in dirt"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-18, 10 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: object=['motorcycle']. object may be small from the aerial framing -- a selectivity/visibility test. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

@@ -1,0 +1,138 @@
+# FRAME — a Filtered-ANN benchmark suite for Known-Item Search
+
+FRAME benchmarks how vector-database systems handle **filtered approximate
+nearest-neighbor search** under realistic Known-Item-Search (KIS) workloads over
+the [V3C](https://videobrowsershowdown.org/) video collection.
+
+Instead of synthetic predicates at swept selectivities, its queries come from real
+interactive-retrieval sessions. Each query is decomposed into a **semantic part**
+(sent to an embedding model) and **structured filter predicates** (scene, object,
+in-frame text), each with exact ground truth. Running every query both *with* and
+*without* its filters lets the suite measure the **delta** from pushing an
+attribute into a filter versus leaving it in the embedding query — under two
+lenses:
+
+- **Geometric correctness** — Recall@k against exact k-NN.
+- **Task success (KIS)** — rank of the known target item, summarised as MRR.
+
+## How it works
+
+A benchmark run has two halves that meet at scoring:
+
+```
+OFFLINE / ORACLE (system-agnostic, exact)      ONLINE / SYSTEM UNDER TEST
+queryset/queries/*.json                        data/benchmark.jsonl
+   │ queryset/build.py                             │
+   ▼                                               ▼   adapter.setup()      (ingest)
+data/benchmark.jsonl ──┐                     Runner(adapter, encoder).run()
+   │ oracle/build_gt.py │                          │   adapter.search(vec, filters, k)
+   ▼ (exact kNN; ground │                          ▼
+     truth written into │                     data/raw_results.<sys>.jsonl
+     each item's block)  │                         │
+   └──────────┬─────────┘                          │
+              ▼                                     │
+        Analyzer().analyze(raw, items)  ◄──────────┘
+              ▼
+        data/metrics.<sys>.jsonl   (Recall@k, MRR, filtered-vs-unfiltered Δ)
+```
+
+The **oracle** computes what the correct answer *is* (exact search, independent of
+any system). Each **adapter** answers the same queries through a real index. Their
+predicate translations are deliberately separate code paths — the gap between the
+oracle's exact result and a system's approximate one is precisely what the
+benchmark reports.
+
+Two contracts hold the design together:
+
+- a shared **logical schema** every system must be able to answer queries against, and
+- a shared **API** (`VectorDBAdapter`) every system implements.
+
+How a system *physically* stores the data is up to its adapter — a system with
+native joins can keep the schema normalized; one without can denormalize into a
+single collection. That mapping lives in the adapter, on purpose, because it is
+part of what the benchmark compares.
+
+## Quickstart
+
+Requires [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync                                    # core harness only
+uv sync --extra pgvector --extra encode    # to run against pgvector
+
+# 1. compile the authored query set -> data/benchmark.jsonl
+uv run python queryset/build.py
+
+# 2. enrich it with exact ground truth (needs the V3C DB + a GPU; see oracle/)
+sbatch build_gt.sh --scene-threshold 0.10 --object-threshold 0.30
+
+# 3. run a system and score it
+uv run python run_benchmark.py --system pgvector
+```
+
+Optional dependency groups keep the heavy toolchains out of a light install:
+`pgvector` (DB driver), `encode` (embedding model), `oracle` (everything the
+ground-truth build needs), `viz` (plots).
+
+## Adding your own system
+
+Implement two methods on `VectorDBAdapter` (`frame/core/adapter.py`):
+
+```python
+class MyAdapter(VectorDBAdapter):
+    name = "mysystem"
+
+    def setup(self) -> None:
+        # connect; materialize the logical schema in your system's own layout;
+        # ensure a vector index exists.
+        ...
+
+    def search(self, query_vector, filters, k) -> list[str]:
+        # translate `filters` (AND-ed abstract predicates; empty == no filter)
+        # into your native query, run filtered k-NN, return k ids ranked best-first.
+        ...
+```
+
+Register it in `run_benchmark.py` and run. The shared `Runner` (drives the queries,
+both conditions, timings) and `Analyzer` (scores against the oracle ground truth)
+are reused unchanged, so every system is measured the same way.
+
+## Repository layout
+
+```
+frame/                     harness package
+  core/    schema · adapter (ABC) · runner · analyzer · encode (shared encoder)
+  adapters/  pgvector · (add your own)
+queryset/                  authored query set (source of truth) + build.py
+  queries/*.json
+oracle/                    build_gt.py — exact ground-truth computation
+data/                      generated artifacts (gitignored)
+build_gt.sh                batch job for the oracle
+run_benchmark.py           run + score a system end-to-end
+```
+
+## Design notes
+
+- **Query set is the source of truth.** `queryset/queries/*.json` are authored by
+  hand; `queryset/build.py` compiles and validates them into `data/benchmark.jsonl`.
+  Ground truth is filled in place by the oracle — it lives in each item's `computed`
+  block, so there is a single artifact rather than a separate ground-truth file.
+- **Fairness.** All systems share one embedding encoder and one set of filter
+  thresholds, so every system searches the same query vectors over the same filtered
+  universe; only the retrieval/filtering under test varies.
+- **One deep run.** Each query retrieves a large `k` once; the analyzer derives
+  Recall@k at smaller cutoffs from that single ranked list.
+- **Two conditions per query** embed different text: the filtered condition embeds
+  the semantic remainder and applies predicates; the unfiltered condition embeds
+  the full original query with no predicate.
+- Adapters return **ranked ids only** — sufficient for Recall@k and MRR.
+
+## Status
+
+Early. The shared harness and a pgvector adapter are in place; the query set and
+ground-truth pipeline run against V3C. Additional systems and a larger query set
+are in progress.
+
+## License
+
+TBD.

@@ -1,0 +1,31 @@
+[project]
+name = "frame-kis"
+version = "0.1.0"
+description = "FRAME — a Filtered-ANN benchmark suite for Known-Item Search over V3C"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24",
+]
+
+# Optional paths keep the heavy toolchains off the light harness install.
+#   uv sync                      -> core harness only
+#   uv sync --extra pgvector     -> + psycopg2 (run against pgvector)
+#   uv sync --extra encode       -> + torch/transformers (shared SigLIP encoder)
+#   uv sync --extra oracle       -> + everything the HPC GT build needs
+#   uv sync --extra viz          -> + matplotlib (plots)
+[project.optional-dependencies]
+pgvector = ["psycopg2-binary>=2.9"]
+encode = ["torch>=2.1", "transformers>=4.40"]
+oracle = ["psycopg2-binary>=2.9", "torch>=2.1", "transformers>=4.40"]
+viz = ["matplotlib>=3.7"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["frame", "frame.core", "frame.adapters"]
+
+[dependency-groups]
+dev = ["pytest>=8"]

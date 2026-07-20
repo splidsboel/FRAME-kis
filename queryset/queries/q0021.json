@@ -1,0 +1,131 @@
+{
+  "query_id": "q0021",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-15",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "several people do not desert with a woman in a green shirt in the back with a black hat",
+  "decomposition": {
+    "vector_query": "people in a desert canyon, a woman in a green shirt and black hat at the back",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "hat"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      },
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "canyon",
+          "desert/sand"
+        ],
+        "vocab": "places365",
+        "mapping_source": "manual",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "07116",
+    "start_s": 113.0,
+    "end_s": 128.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "two men kissing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a girl with a green hat in the antelope canyon"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman with a green hat in a desert cave"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman with a green hat inside a desert cave"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "many people walking in a desert"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "several people do not desert with a woman in a green shirt in the back with a black hat"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "several people do no desert with a woman in a green shirt in the back with a black hat"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "several people in a desert with a woman in a green shirt in the back with a black hat"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "Antelope Canyon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman walking in  cave"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman walking in antelope canyon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman walking in desert cave"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman walking in  canyon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman in green shirt walking in  canyon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "antelope canyon"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "desert cave"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-15, 16 real user phrasings (visione+vitrivr-vr) for one V3C1 target. Filters: object=['hat']; scene=['canyon', 'desert/sand']. scene+object conjunction; Antelope-Canyon-like slot canyon. Scene labels are PROVISIONAL best-guesses -- validate against SELECT DISTINCT label FROM scene_labels before flipping verified. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

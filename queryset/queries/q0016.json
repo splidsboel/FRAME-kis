@@ -1,0 +1,109 @@
+{
+  "query_id": "q0016",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-1",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road and pedestrian crtoss",
+  "decomposition": {
+    "vector_query": "the shadow of a motorcyclist on the road, filmed from the motorcycle",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "crosswalk"
+        ],
+        "vocab": "places365",
+        "mapping_source": "manual",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "04178",
+    "start_s": 75.0,
+    "end_s": 92.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "crosswalk"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "shot taken from a motorcycle you can see the road of the pedestrian crossing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "road taken by a motorcycle with the shadow of a motorcyclist"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "shot taken from a motorcycle you can see the pedestrian crossing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road and pedestrian"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road and pedestrian crtoss"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "image taken from a motorcycle you can see the shadow on the road and the stripes"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "all the helmet"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a white arrow on a road"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "helmet"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "it better than a lot more"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a crosswalk on pavement"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "driving past a crosswalk looking down"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-1, 14 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: scene=['crosswalk']. POV shot: the motorcycle itself is out of frame (only its shadow), so an object=motorcycle filter would miss -- the pedestrian crossing (scene) is the reliable predicate. Scene labels are PROVISIONAL best-guesses -- validate against SELECT DISTINCT label FROM scene_labels before flipping verified. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

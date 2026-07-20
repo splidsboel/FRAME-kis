@@ -1,0 +1,62 @@
+{
+  "query_id": "q0015",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-9",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a dragonfly on some leaves on the water",
+  "decomposition": {
+    "vector_query": "a dragonfly resting on leaves on the surface of the water",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "01939",
+    "start_s": 320.5,
+    "end_s": 348.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "dragonfly on water"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "insect on water"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a dragonfly on some leaves on the water"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dragonfly ina pond"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dragonfly on lake"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dragonfly in a pond"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "dragonfly inn a pond"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS v21-9, 7 real phrasings. DEMOTED to semantic-only via target inspection: the dragonfly-on-water target classifies as wheat_field@0.92 (dragonfly detected as bird@0.69); no water scene present (marsh@0.000), and dragonfly is not in the object vocab. No faithful filter."
+}

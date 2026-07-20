@@ -1,0 +1,125 @@
+{
+  "query_id": "q0022",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-17",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a man walking iin the middle of a road in a forest beside a gray car. there is a yellow stipe in the road",
+  "decomposition": {
+    "vector_query": "a man walking down the middle of a forest road beside a parked gray car",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "forest_road",
+          "forest/broadleaf"
+        ],
+        "vocab": "places365",
+        "mapping_source": "target-inspection",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "03331",
+    "start_s": 50.0,
+    "end_s": 62.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking on a road in the middle of the woods"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking on a dark road in the middle of the woods"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man on a road in a forest beside a gray car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking iin the middle of a road in a forest beside a gray car"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking iin the middle of a road in a forest beside a gray car. thre is a yellow stipe in the road"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking on a dark road in the middle of a forest"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking on a road in the middle of the forest"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking iin the middle of a road in a forest beside a gray car. there is a yellow stipe in the road"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking iin the middle of a road in a forest beside a gray car. there is a yellow paint in the road"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man walking alone on a road in the middle of the forest"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man on forrest road"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "van 0124"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man walking on road in  forest"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man on forrest street"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man walking toward  the camera in the forest"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man walking toward  the camera on a forest road"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man walking towards the camera on a forest road"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS v21-17, 17 real phrasings. FIXED via target inspection: forest_road@0.75 already held; the gray car is not detected (only man@0.54), so the car object arm was dropped. Scene-only, expected to pass."
+}

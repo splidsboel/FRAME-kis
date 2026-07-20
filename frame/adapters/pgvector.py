@@ -1,0 +1,126 @@
+"""
+pgvector adapter — the first system under test (build this one first).
+
+This is the SYSTEM-UNDER-TEST predicate translation. It is intentionally a
+SEPARATE code path from oracle/build_gt.py's predicate_to_sql(): the oracle
+computes exact truth (sequential scan, indexes off); this asks the real HNSW
+index and lives with its approximation. The gap between them is a result we
+measure — so the two must not share translation code.
+
+Physical layout: pgvector holds the normalised V3C schema (see V3C Schema.md), so
+`setup()` here is just a connection + index sanity check — the "ingest the logical
+schema" step is already satisfied by the existing V3C load. Filtering is done with
+native JOIN/EXISTS against the side tables. (Chroma/Milvus adapters will instead
+denormalise in their own setup() — that asymmetry is the research point.)
+
+FAIRNESS: confidence thresholds are PINNED (scene 0.10, object 0.30 — the values
+chosen in the query-set repo diagnostics) so every system filters over the same
+passing universe. Pattern-match (OCR) has no threshold by design.
+
+Requires the `pgvector` extra (psycopg2). Connection via libpq env vars
+(PGHOST/PGUSER/…); on the HPC PGHOST is the unix socket dir (see HPC notes).
+"""
+
+from __future__ import annotations
+
+from typing import Sequence
+
+import numpy as np
+
+from ..core.adapter import VectorDBAdapter
+from ..core.schema import Predicate
+
+# Pinned fairness thresholds (see query-set repo "Chosen confidence thresholds").
+SCENE_THRESHOLD = 0.10
+OBJECT_THRESHOLD = 0.30
+
+# Side-table sources for label filters: filter_type -> (table, alias, threshold).
+_LABEL_SOURCES = {
+    "scene":  ("scene_labels", "sl", SCENE_THRESHOLD),
+    "object": ("object_detections", "od", OBJECT_THRESHOLD),
+}
+
+
+class PgvectorAdapter(VectorDBAdapter):
+    name = "pgvector"
+
+    def __init__(self, dsn: str | None = None, ef_search: int = 400):
+        # dsn=None -> libpq reads PG* env vars (PGHOST socket dir on the HPC).
+        self.dsn = dsn
+        self.ef_search = ef_search
+        self._conn = None
+
+    def setup(self) -> None:
+        import psycopg2  # optional dep (`pgvector` extra)
+
+        self._conn = psycopg2.connect(self.dsn) if self.dsn else psycopg2.connect()
+        self._conn.autocommit = True
+        with self._conn.cursor() as cur:
+            # HNSW search-time recall knob; set per session.
+            cur.execute("SET hnsw.ef_search = %s;", (self.ef_search,))
+            # Sanity: the vector index we rely on must exist.
+            cur.execute("SELECT to_regclass('public.keyframes_embedding_hnsw_idx');")
+            row = cur.fetchone()
+            if row is None or row[0] is None:
+                raise RuntimeError("keyframes HNSW index missing — check the V3C load")
+
+    def teardown(self) -> None:
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+
+    def search(
+        self,
+        query_vector: np.ndarray,
+        filters: Sequence[Predicate],
+        k: int,
+    ) -> list[str]:
+        assert self._conn is not None, "call setup() first"
+        where_sql, params = self._build_filters(filters)
+        vec_literal = "[" + ",".join(f"{x:.8f}" for x in query_vector.tolist()) + "]"
+
+        sql = (
+            "SELECT k.keyframe_id "
+            "FROM keyframes k "
+            f"{where_sql} "
+            "ORDER BY k.embedding <=> %s::vector "
+            "LIMIT %s"
+        )
+        with self._conn.cursor() as cur:
+            cur.execute(sql, (*params, vec_literal, k))
+            return [row[0] for row in cur.fetchall()]
+
+    # ── predicate translation (system-under-test side) ──
+    def _build_filters(self, filters: Sequence[Predicate]) -> tuple[str, list]:
+        """AND-ed EXISTS subqueries against the side tables. Table/alias/column
+        names come only from our own constants, never from item data, so they are
+        safe to interpolate; all VALUES are bound parameters."""
+        clauses: list[str] = []
+        params: list = []
+        for f in filters:
+            if f.filter_type in _LABEL_SOURCES:
+                table, alias, thresh = _LABEL_SOURCES[f.filter_type]
+                clauses.append(
+                    f"EXISTS (SELECT 1 FROM {table} {alias} "
+                    f"WHERE {alias}.keyframe_id = k.keyframe_id "
+                    f"AND {alias}.label = ANY(%s) AND {alias}.confidence >= %s)"
+                )
+                params.append(list(_as_list(f.value)))
+                params.append(thresh)
+            elif f.filter_type == "pattern-match":
+                # case-insensitive substring over OCR spans; match ANY value.
+                likes = ["%" + v.lower() + "%" for v in _as_list(f.value) if v]
+                clauses.append(
+                    "EXISTS (SELECT 1 FROM keyframe_ocr o "
+                    "WHERE o.keyframe_id = k.keyframe_id "
+                    "AND lower(o.text) LIKE ANY(%s))"
+                )
+                params.append(likes)
+            else:
+                raise ValueError(f"unsupported filter_type: {f.filter_type!r}")
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+        return where, params
+
+
+def _as_list(value) -> list:
+    return [value] if isinstance(value, str) else list(value)

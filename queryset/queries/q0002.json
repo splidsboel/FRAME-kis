@@ -1,0 +1,35 @@
+{
+  "query_id": "q0002",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione",
+    "task_name": "v21-3",
+    "task_type": "Visual KIS",
+    "timestamp": 1624280104913,
+    "solved_by_team": false
+  },
+  "raw_query_text": "view of a snowy mountain with trees the sun the sky",
+  "decomposition": {
+    "vector_query": "mountain with trees, the sun and the sky",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": ["ski_slope", "mountain_snowy", "snowfield"],
+        "vocab": "places365",
+        "mapping_source": "vbs_label_mapping.json",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "05146",
+    "start_s": 6.0,
+    "end_s": 26.0
+  },
+  "notes": "solved_by_team=false: from a reformulation grind on v21-3 that never resolved. Weaker-GT stratum (target known from run.json, but query-sufficiency unverified since no human solved it with this text). Same target has ~10 sibling reformulations in the log. Label-mapping note: added 'ski_slope' to the filter — Places365 reads the target (05146_00004) as ski_slope:0.81, with mountain_snowy/snowfield only ~0.05; without ski_slope the target barely passes the scene filter (target_best_match dropped to 0.047). Example of a MISSING-SIBLING-LABEL failure mode: target IS the scene, but the dominant Places365 label was absent from the mapping."
+}

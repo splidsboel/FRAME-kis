@@ -1,0 +1,120 @@
+{
+  "query_id": "q0012",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-7",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a woman wearing a white hat and a pink shirt , she is holding a very big fish",
+  "decomposition": {
+    "vector_query": "a woman holding a very large fish",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "fish",
+          "hat"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "04035",
+    "start_s": 296.0,
+    "end_s": 313.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "woman with pink shirt shows fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman in a fuchsia sweater and a white hat holding a fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman in a fuchsia shirt with a big fish in her arms"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a big fish in very dirty water"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a big fish in muddy water"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman in a fuchsia sweater and a white hat , she holding a fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman in a fuchsia sweater and a white hat , she is holding a fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman with a white hat , she is holding a fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman with a white hat , she is holding a big fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman wearing a white hat , she is holding a big fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman wearing a white hat , she is holding a very big fish"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a woman wearing a white hat and a pink shirt , she is holding a very big fish"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a woman holding a large fish"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman holding a fish"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a woman holding a fish"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "woman holding fish"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-7, 16 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: object=['fish', 'hat']. object+object conjunction (fish held by a woman in a white hat). Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

@@ -1,0 +1,35 @@
+{
+  "query_id": "qNNNN",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "",
+    "task_name": "",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "",
+  "decomposition": {
+    "vector_query": "",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [],
+        "vocab": "places365",
+        "mapping_source": "vbs_label_mapping.json",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "",
+    "start_s": null,
+    "end_s": null
+  },
+  "notes": ""
+}

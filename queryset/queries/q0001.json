@@ -1,0 +1,35 @@
+{
+  "query_id": "q0001",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge",
+    "task_name": "v21-19",
+    "task_type": "Visual KIS",
+    "timestamp": 1624450613000,
+    "solved_by_team": true
+  },
+  "raw_query_text": "snow with mountains in the horizon",
+  "decomposition": {
+    "vector_query": "mountains in the horizon",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": ["snowfield", "mountain_snowy", "mountain"],
+        "vocab": "places365",
+        "mapping_source": "vbs_label_mapping.json",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "02464",
+    "start_s": 233.0,
+    "end_s": 253.0
+  },
+  "notes": "Scene-dominant query: 'snow'/'mountains' ARE the scene, so little semantic content remains once pushed into the filter. Good test of whether scene filtering helps or hurts when the query is mostly setting."
+}

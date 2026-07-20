@@ -1,0 +1,115 @@
+{
+  "query_id": "q0020",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-16",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "image of the side of a boat in the sea at the bottom you can see mountains in the clouds",
+  "decomposition": {
+    "vector_query": "the side of a boat in the sea with mountains in the clouds behind",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "boat"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": false
+      },
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "mountain_snowy"
+        ],
+        "vocab": "places365",
+        "mapping_source": "manual",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "06246",
+    "start_s": 22.0,
+    "end_s": 35.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "boat and water foam"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "scene of a slightly snowy mountain and the blue sky with lots of clouds"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a boat in the sea"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "image of the side of a boat in the sea at the bottom you can see mountains in the clouds"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "mountains and a sky full of clouds above"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "sky cloud mountain"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "wake of a  boat"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "ltd"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boat"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "mountains with clouds"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "mountain range in  fronnt of cloudy sky"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boat with mountain in background"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "boat from side with mountain in background"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS v21-16, 13 real phrasings. CONJUNCTION CO-LOCATION HARM EXEMPLAR (target inspection): boat@0.84 is on keyframe ...05 while mountain_snowy@0.35 is on keyframe ...04 -- both predicates individually hold on the target shot, but never on the SAME keyframe, so the AND excludes the target. New mechanism distinct from q0003 (taxonomy) and q0004 (detector miss). Kept deliberately; relax to object=boat alone if a valid item is wanted instead."
+}

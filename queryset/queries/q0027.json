@@ -1,0 +1,67 @@
+{
+  "query_id": "q0027",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-8",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a man with a beard in the foreground talking sees your shirt collar",
+  "decomposition": {
+    "vector_query": "a bearded man talking in the foreground",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "04979",
+    "start_s": 333.0,
+    "end_s": 352.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "man with beard"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "man with black beard"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man with a beard in the foreground talking sees your shirt collar"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man on a bench"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a man on a bench with a bottle in his hand"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "statement"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "a bearded man talking"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black and white man on a bench"
+    }
+  ],
+  "notes": "VBS2021 Visual KIS task v21-8, 8 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: none (semantic-only). semantic-only: only person/man is present, which is non-selective. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

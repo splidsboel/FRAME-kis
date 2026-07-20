@@ -1,0 +1,134 @@
+{
+  "query_id": "q0025",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "t21-3",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "historic sepia image of a hurdle race and discus throwing, a men run towards the camera, with bystanders on the sides.",
+  "decomposition": {
+    "vector_query": "historic sepia footage of a hurdle race and discus throwing, runners toward the camera",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "athletic_field/outdoor"
+        ],
+        "vocab": "places365",
+        "mapping_source": "manual",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "06228",
+    "start_s": 0.0,
+    "end_s": 13.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "hurdle race"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic shots of a hurdle race and discus throwing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic image of a hurdle race and discus throwing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic image of a hurdle race and discus throwing. the video is in sepia tones."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "sepia historic shots of a hurdle race and discus throwing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic image of a hurdle race and discus throwing."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic image of a hurdle race and discus throwing. sepia color"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "sepia hurdle race and discus throwing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic sepia image of a hurdle race and discus throwing"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic sepia image of a hurdle race and discus throwing, a men run towards the camera, with bystanders on the sides."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "sepia hurdle race"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "historic image of a hurdle race and discus throwing, a men run towards the camera, with bystanders on the sides."
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a sepia tone image"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "discus throw"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "100 metres hurdles"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "Olympic sport"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "Olympic Games"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "historic footage of a hurdle race"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "historic photo hurdle race"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS task t21-3, 19 real user phrasings (verge+visione+vitrivr-vr) for one V3C1 target. Filters: scene=['athletic_field/outdoor']. scene label provisional (athletics ground); historic sepia footage. Scene labels are PROVISIONAL best-guesses -- validate against SELECT DISTINCT label FROM scene_labels before flipping verified. Auto-scaffolded 2026-07-15 from team_queries_2021.csv; decomposition + target_passes_filter need an HPC build_gt run before verifying."
+}

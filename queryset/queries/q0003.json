@@ -1,0 +1,44 @@
+{
+  "query_id": "q0003",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge",
+    "task_name": "v21-21",
+    "task_type": "Visual KIS",
+    "timestamp": 1624451978000,
+    "solved_by_team": true
+  },
+  "raw_query_text": "playing tambourine in church",
+  "decomposition": {
+    "vector_query": "a person playing a tambourine",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": ["church/indoor", "church/outdoor"],
+        "vocab": "places365",
+        "mapping_source": "manual",
+        "verified": true
+      },
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "in",
+        "value": ["tambourine"],
+        "vocab": "yoloworld/object_vocab.txt",
+        "mapping_source": "manual",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "03885",
+    "start_s": 215.5,
+    "end_s": 229.0
+  },
+  "notes": "Scene filter (church/indoor + church/outdoor) is viable ONLY after the places365_classify.py re-run that keeps the full category path — the old build collapsed '/c/church/indoor' to bare 'indoor'. Labels confirmed present in scene_labels after the 2026-07-08 re-run. DOCUMENTED FILTER-HARM EXEMPLAR: the target keyframes (03885_00021..24) classify as orchestra_pit (0.83-0.98), auditorium, legislative_chamber — NOT church — so the target carries no filter label in its top-5 and fails the scene filter at every threshold (target_passes_filter=false, filtered recall@k=0 expected). This is the TAXONOMY-SEMANTIC-DIVERGENCE failure mode: the church interior with musicians on staging visually reads as a performance space to Places365, so a hard categorical church/* filter excludes the semantically-correct target. NOT a mapping typo — do NOT 'fix' by adding orchestra_pit (that would corrupt the query's church semantics). Keep as-is to demonstrate scene-filter harm. UPGRADED 2026-07-09 to a scene+object conjunction (object={tambourine}, YOLO-World vocab) now that Tier-3 object detection has run. Because the filters are AND-ed and the scene predicate already excludes the target, target_passes_filter stays false — the point of the conjunction is COMPOUNDING HARM: a semantically-correct object predicate cannot rescue a target that a taxonomy-divergent scene predicate has already killed. CONFIRMED by the 2026-07-09 diagnostics run: tambourine is detected on target keyframe 03885_00024 at confidence 0.43 (scene church best-match on the same targets = 0.0), so object.verified=true. This SHARPENS the exemplar into a clean attribution: the object filter ALONE would retain the target (it passes at any t_object <= 0.43), so the conjunction's failure is due PURELY to the taxonomy-divergent church scene predicate, not the object signal. It is the strongest single demonstration that a correct attribute filter cannot rescue a target already excluded by a harmful one in a conjunction."
+}

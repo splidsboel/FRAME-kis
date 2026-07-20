@@ -1,0 +1,185 @@
+{
+  "query_id": "q0018",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "t21-4",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "an african man runs across a street with trees and parked cars, stops on the sidewalk and walks towards the camera",
+  "decomposition": {
+    "vector_query": "a man runs across a tree-lined street with parked cars and stops on the sidewalk",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "street",
+          "downtown"
+        ],
+        "vocab": "places365",
+        "mapping_source": "target-inspection",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "06561",
+    "start_s": 670.0,
+    "end_s": 689.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "African man runs across a street with trees"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "black and white bench"
+    },
+    {
+      "team": "verge",
+      "action": "textQuery",
+      "text": "black and white African man with dreadlocks"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man runs across a street with trees and parked cars, stops on the sidewalk and walks towards the camera"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man runs across a street with trees and parked cars"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black man runs across a street with trees and parked cars, stops on the sidewalk and walks towards the camera"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black man runs across a street"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man runs across a street with trees and parked cars, thre is a bench"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man runs across a street with trees and parked cars, there is a bench"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a back man"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black man"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a black man with dreadlocks"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a african man with dreadlocks"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "a african man with dreadlocks, on the left of the sidewalk there is a low wall"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man runs across a street"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "old picture of a black man runs across a street"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black and white picture of a black man runs across a street"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man with dreadlocks runs across a street with trees and parked cars"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black and white picture of a black man runs across a street. a bench"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man with dreadlocks"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "black and white picture of a black man runner. a bench"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man with dreadlocks hair"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man with dreadlocks hair runs across a street with trees and parked cars"
+    },
+    {
+      "team": "visione",
+      "action": "textQuery",
+      "text": "an african man with curly hair runs across a street with trees and parked cars"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "man runs across the street"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "black man crosses the street"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "an african man runs across a street in  black and white"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "african man crosses the street"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "textQuery",
+      "text": "an man  with dreadlocks runs across a street in  black and white"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS t21-4, 29 real phrasings. FIXED via target inspection: scene 'street' was absent; target classifies as downtown@0.29 -> scene={street,downtown}. Bench not detected -> object arm dropped. Scene-only, expected to pass."
+}
