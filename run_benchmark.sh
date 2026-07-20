@@ -3,7 +3,7 @@
 #SBATCH --partition=cores_any
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --output=frame_run_%j.out
 
 # Run a system end-to-end and score it. Like build_gt.sh it needs the V3C postgres
