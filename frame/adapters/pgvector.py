@@ -8,7 +8,8 @@ index and lives with its approximation. The gap between them is a result we
 measure — so the two must not share translation code.
 
 Physical layout: pgvector holds the normalised V3C schema (see V3C Schema.md), so
-`setup()` here is just a connection + index sanity check — the "ingest the logical
+`setup()` here is a connection + index sanity check + a pinned ANALYZE of every
+filter relation (fairness invariant — see _ANALYZE_TABLES) — the "ingest the logical
 schema" step is already satisfied by the existing V3C load. Filtering is done with
 native JOIN/EXISTS against the side tables. (Chroma/Milvus adapters will instead
 denormalise in their own setup() — that asymmetry is the research point.)
@@ -40,6 +41,15 @@ _LABEL_SOURCES = {
     "scene":  ("scene_labels", "sl", SCENE_THRESHOLD),
     "object": ("object_detections", "od", OBJECT_THRESHOLD),
 }
+
+# FAIRNESS INVARIANT — pinned statistics state. Every relation this adapter's
+# filtered searches plan over is ANALYZEd in setup(), so the planner's selectivity
+# estimates (and therefore the exact-seqscan ↔ approximate-HNSW plan choice, and
+# thus recall) are deterministic instead of hostage to whenever autovacuum last ran.
+# Array-overlap (`&&`) columns like videos.categories in particular have NO
+# most-common-elements stats until ANALYZEd, so the planner falls back to a blind
+# constant estimate and always picks exact — masking the very cutover we measure.
+_ANALYZE_TABLES = ("keyframes", "scene_labels", "object_detections", "keyframe_ocr", "videos")
 
 
 class PgvectorAdapter(VectorDBAdapter):
@@ -77,6 +87,13 @@ class PgvectorAdapter(VectorDBAdapter):
             row = cur.fetchone()
             if row is None or row[0] is None:
                 raise RuntimeError("keyframes HNSW index missing — check the V3C load")
+            # Pin the statistics state (fairness invariant): refresh planner stats on
+            # every filter relation so plan choice + recall are reproducible. Skip any
+            # table absent from this deployment (e.g. before a schema is fully loaded).
+            for table in _ANALYZE_TABLES:
+                cur.execute("SELECT to_regclass(%s);", (f"public.{table}",))
+                if _scalar(cur) is not None:
+                    cur.execute(f"ANALYZE {table};")
 
     def teardown(self) -> None:
         if self._conn is not None:
