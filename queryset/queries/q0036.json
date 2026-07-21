@@ -1,0 +1,147 @@
+{
+  "query_id": "q0036",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "v21-13",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a shirtless man getting dressed indoors; a laughing blonde girl with a light-blue bandana on her head",
+  "decomposition": {
+    "vector_query": "a shirtless man getting dressed indoors, and a laughing blonde girl with a light-blue bandana on her head",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "dressing_room",
+          "music_studio",
+          "home_theater",
+          "movie_theater/indoor"
+        ],
+        "vocab": "places365",
+        "mapping_source": "scene_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "02034",
+    "start_s": 38.0,
+    "end_s": 57.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a shirtless person behind you can see a wall with black and white stripes"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a wedding scene"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing girl has a light blue bandana on her head and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a shirtless man"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shirtless man who is dressing the back wall in black and white stripes"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shirtless man who is dressing"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing girl has a light blue foulard on her head and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a bride who wears white"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing girl has foulard on her hair and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing blonde girl has foulard on her hair and blonde hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing blonde girl has foulard on her bond hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a laughing girl has foulard on her bond hair"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a woman with a headband crying"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a bride who dresses herself white"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "man undressing"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "we were younng we"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "shes the one"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "man getting dressed"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "we were young"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "naked man getting dressed"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "OCR",
+      "text": "shelter"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. dim-interior hedge grounded in \"getting dressed / undressing / wedding\" (dressing room vs studio vs home/movie theatre). Union selectivity 9.09% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

@@ -1,0 +1,210 @@
+{
+  "query_id": "q0033",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-6",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a large hall full of people celebrating an Indian wedding, an adorned bride dressed in pink",
+  "decomposition": {
+    "vector_query": "many people celebrating an Indian wedding, an adorned bride dressed in pink with a crown",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "conference_center",
+          "dressing_room",
+          "ballroom",
+          "banquet_hall",
+          "reception",
+          "dining_hall",
+          "auditorium"
+        ],
+        "vocab": "places365",
+        "mapping_source": "scene_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "00088",
+    "start_s": 264.0,
+    "end_s": 281.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "indian wedding"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "indian wedding pink dress"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "indian bride with pink dress"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian wedding"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "two indian spouses who enter behind there are curtains"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a man and a woman dance an indian dance"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian bride dressed in pink with a crown on her head dancing"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl dressed in pink with a crown on her head walking next to a man dressed in white"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "indian responses enter from a room with a white curtain"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "indian wedding enter from a room with a white curtain"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl dressed in pink with a crown on her head walking next to a man dressed in white,there are curtains in the background and many people"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian adorned bride greets"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl dressed in pink walking next to a man dressed in white"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "they donate that an indian woman walks into a woman room so many jewels"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a room full of people are celebrating a wedding"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a room full of people are celebrating a indian wedding"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl dressed in pink walking next to a man dressed in whit, the girl has earrings and a tiara"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl dressed in pink walking next to a man dressed in white, the girl has earrings and a tiara"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl with a tiara"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl with a tiara danxcing"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a wooden dining room"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an indian girl with a tiara dancing"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "OCR",
+      "text": "exit"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian wedding"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "concept",
+      "text": "exit sign"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "indian wedding with exit sign"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian woman in a pink dress"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian woman in a wedding dress"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "indian bride walking down  the aisle"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian wedding in a large hall"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian woman in a pinkdress ata photo shoot"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "an indian woman in a pinkdress at a photo shoot"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "indian bride in pink dress walking down  the aisle"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. large-venue hedge: describers said large hall / room full of people / dining room / wedding hall \u2014 unsure of the venue type. Union selectivity 6.85% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

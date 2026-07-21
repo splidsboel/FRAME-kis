@@ -1,0 +1,115 @@
+{
+  "query_id": "q0031",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-1",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "shot taken from a motorcycle, you can see the road with a pedestrian crossing and the shadow of the motorcyclist",
+  "decomposition": {
+    "vector_query": "point-of-view shot from a moving motorcycle, the shadow of the motorcyclist visible on the ground below",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "crosswalk",
+          "highway",
+          "driveway",
+          "parking_lot",
+          "street",
+          "forest_road",
+          "runway"
+        ],
+        "vocab": "places365",
+        "mapping_source": "scene_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "04178",
+    "start_s": 75.0,
+    "end_s": 92.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "concept",
+      "text": "crosswalk"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shot taken from a motorcycle you can see the road of the pedestrian crossing"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "road taken by a motorcycle with the shadow of a motorcyclist"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shot taken from a motorcycle you can see the pedestrian crossing"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road and pedestrian"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "pictures taken from a motorcycle you see the shadow of the motorcyclist on the road and pedestrian crtoss"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "image taken from a motorcycle you can see the shadow on the road and the stripes"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "all the helmet"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a white arrow on a road"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "helmet"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "it better than a lot more"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a crosswalk on pavement"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "driving past a crosswalk looking down"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. road/paved-surface hedge: describers said crosswalk / road / pavement \u2014 unsure of the road type seen from the bike. Union selectivity 5.19% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

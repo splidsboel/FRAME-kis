@@ -1,0 +1,81 @@
+{
+  "query_id": "q0034",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-8",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a bearded man sitting on a bench with a bottle in his hand, talking, black and white",
+  "decomposition": {
+    "vector_query": "a bearded man sitting outdoors talking to the camera, black and white footage",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "bench",
+          "bottle",
+          "tie"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "04979",
+    "start_s": 333.0,
+    "end_s": 352.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "man with beard"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "man with black beard"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a man with a beard in the foreground talking sees your shirt collar"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a man on a bench"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a man on a bench with a bottle in his hand"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "ASR",
+      "text": "statement"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a bearded man talking"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "black and white man on a bench"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. scene-object hedge grounded in \"a man on a bench with a bottle ... sees your shirt collar\" (bench/bottle/tie). Union selectivity 8.22% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

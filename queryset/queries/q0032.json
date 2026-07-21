@@ -1,0 +1,93 @@
+{
+  "query_id": "q0032",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-18",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a motocross rider on a dirt bike jumping on an outdoor track in the countryside, seen from above",
+  "decomposition": {
+    "vector_query": "a rider jumping on an outdoor dirt track in the countryside, aerial view",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "motorcycle",
+          "bicycle",
+          "helmet",
+          "wheel",
+          "tire"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "05531",
+    "start_s": 74.0,
+    "end_s": 87.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "motocross"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a motorcycle jumping in the countryside"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a motocross track seen from above"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a motocross race"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a motorcross jumping in the countryside"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "an outdoor motocross track in the countryside seen from above"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "dirtbike"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "concept",
+      "text": "Dirt Bike"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "dirt biking people"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "motorcycling in dirt"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. two-wheeler + rider-gear hedge: describers said motocross / dirt bike / motorcycle \u2014 the machine and its wheels/helmet. Union selectivity 6.82% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

@@ -1,0 +1,193 @@
+{
+  "query_id": "q0035",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "verge+visione+vitrivr-vr",
+    "task_name": "v21-2",
+    "task_type": "Visual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "two go-karts racing downhill on grass in a meadow, one kart is red and yellow, point-of-view camera",
+  "decomposition": {
+    "vector_query": "two small racing vehicles going downhill on grass in a meadow, one red and yellow, point-of-view camera",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "motorcycle",
+          "truck",
+          "car",
+          "van",
+          "bicycle"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "object_vocab.txt",
+        "verified": true
+      }
+    ],
+    "method": "manual",
+    "verified": true
+  },
+  "target": {
+    "video_id": "01162",
+    "start_s": 922.0,
+    "end_s": 948.0
+  },
+  "user_query_variants": [
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "downhill cart race"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "two legs in the cart"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "pov camera in cart race"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "two legs visible from camera"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "two legs visible from camera while driving"
+    },
+    {
+      "team": "verge",
+      "action": "jointEmbedding",
+      "text": "cart race on a hill"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shooting of two go-karts in the meadow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two go karts in a meadow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "one of the go-karts is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two karts in a meadow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shooting of two karts in the meadow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two gokarts in a meadow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two karts in a meadow, one of the karts is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two karts i, one of the karts is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shooting of two karts in a yellow-wheeled kart road"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "images taken by two karts, one of the karts is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "taken by two moped-like vehicles in the meadow, one of the karts is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "taken by two moped-like vehicles in the meadow, one is red and yellow"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shooting of two karts"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "shooting of two karts. two legs"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "karts two legs"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "they go to the legs of a person who drives some kind of grass scooter"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "there are legs of a person who drives some kind of grass scooter"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "OCR",
+      "text": "jay lee"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "gokart driving on  grass"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "downhill race"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "downhill race cart"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "go cart racing downhil"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "go cart racing on gras"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "go cart racing on grass"
+    }
+  ],
+  "notes": "NEW disjunctive KIS query authored to populate the pgvector exact->approximate planner cutover (~5-15% here); step 1 of the cutover work. vehicle-identity hedge: describers said go-kart / cart / kart racing \u2014 the small vehicles are not a dedicated label, so the hedge unions nearby vehicle classes. Union selectivity 8.59% (author_probe --unions, job 99888), target passes (>=1 union member >= threshold). GT enrichment (build_gt) still pending before it can be scored."
+}

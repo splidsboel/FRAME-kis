@@ -1,0 +1,207 @@
+{
+  "query_id": "q0009",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2021",
+    "team": "visione+vitrivr-vr",
+    "task_name": "t21-7",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "a young man sitting outdoors and eating, he wears a dark t-shirt and silver headphones, it is evening, trees are visible behind him",
+  "decomposition": {
+    "vector_query": "a young man sitting outdoors eating in the evening, wearing a dark t-shirt, trees behind him",
+    "filters": [],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "04316",
+    "start_s": 1390.0,
+    "end_s": 1397.0
+  },
+  "user_query_variants": [
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eating"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eating, he wears a dark t-shirt and silver headphones"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy sitting outdoors and eating, he wears a dark t-shirt and silver headphones"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eating with a dark t-shirt and silver headphones."
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy sitting outdoors and eating"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eating."
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy with with a dark t-shirt and silver headphones."
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy sitting outdoors and eating, he wears a dark t-shirt and silver headphones, trees are visible behind him"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy sitting outdoors and eating."
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy sitting outdoors and eating, he wears a dark t-shirt, trees are visible behind him"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy with a dark t-shirt and silver headphones sitting outdoors and eating."
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "boy headphone eating tress"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "boy eating headphones tress"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a boy with a dark t-shirt"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "man eating headphones tress"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a person with a dark t-shirt"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a person with a dark t-shirt eating"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "man eating with headphones tress in background"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man is sitting outdoors and eating, he wears a dark t-shirt and silver headphones. it is evening, trees are visible behind him"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "man eats tress in background"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "man eats trees in background"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "man headphone eats trees in background"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eatingwearing headphones"
+    },
+    {
+      "team": "visione",
+      "action": "concept",
+      "text": "a young man sitting outdoors and eating, wearing headphones"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "yung man sitting outdoors eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a young man sitting outdoors and  eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "young man with headphones sitting outdoors eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a young man in a dark t-shirt sitting outdoors and  eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a young man with headphones eating outside"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "young man with headphones sitting in front of trees eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a man with headphones eating outside"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "young man with headphones sitting outside eating"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a man with a dark t-shirt and headphones"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "young man with headphones sitting outside in  the evening"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "a man with a dark t-shirt and headphones in  front of trees"
+    },
+    {
+      "team": "vitrivr-vr",
+      "action": "jointEmbedding",
+      "text": "man with headphones sitting outside in  the evening"
+    }
+  ],
+  "notes": "VBS2021 Textual KIS t21-7 (target 04316 @1390-1397s) — the last uncovered 2021 KIS task. BLOCKED on target-keyframe alignment: the A3 shot-overlap mapping yields only 1 keyframe whose detections are woman@0.60 / scarf@0.46 with indoor scenes (slum, hospital_room, beauty_salon), which contradict the query (a young man eating OUTDOORS with headphones and trees, in the evening). This looks like a misaligned or mislabeled target keyframe, so no content-grounded filter can be authored yet — filter left empty (no-filter baseline only) pending A3 verification of the 04316 clip window. Do NOT author a filter over {woman,scarf}; verify the target frame first. author_probe survey job 99890."
+}
