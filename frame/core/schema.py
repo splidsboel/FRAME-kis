@@ -26,10 +26,10 @@ from typing import Any, Iterable, Iterator, Sequence
 # ─────────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
 class Predicate:
-    filter_type: str          # "scene" | "object" | "pattern-match"
-    attribute: str            # e.g. "scene_label", "object_label", "ocr_text"
+    filter_type: str          # "scene" | "object" | "pattern-match" | "video-category" | "video-tag"
+    attribute: str            # e.g. "scene_label", "object_label", "ocr_text", "video_categories"
     op: str                   # "in" | "contains"
-    value: Any                # list[str] for label filters; str|list[str] for pattern
+    value: Any                # list[str] for label/video-meta filters; str|list[str] for pattern
     vocab: str | None = None
     mapping_source: str | None = None
     verified: bool = False

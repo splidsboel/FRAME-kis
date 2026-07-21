@@ -42,6 +42,14 @@ _LABEL_SOURCES = {
     "object": ("object_detections", "od", OBJECT_THRESHOLD),
 }
 
+# Video-level metadata filters: filter_type -> videos.<column> (curated V3C ARRAY,
+# set-overlap, NO confidence floor). Broad facets that exercise the planner's
+# selectivity estimate — see the ANALYZE fairness invariant below.
+_VIDEO_META_SOURCES = {
+    "video-category": "categories",
+    "video-tag": "tags",
+}
+
 # FAIRNESS INVARIANT — pinned statistics state. Every relation this adapter's
 # filtered searches plan over is ANALYZEd in setup(), so the planner's selectivity
 # estimates (and therefore the exact-seqscan ↔ approximate-HNSW plan choice, and
@@ -242,6 +250,14 @@ class PgvectorAdapter(VectorDBAdapter):
                     "AND lower(o.text) LIKE ANY(%s))"
                 )
                 params.append(likes)
+            elif f.filter_type in _VIDEO_META_SOURCES:
+                # set-overlap against the parent video's curated array; no threshold.
+                col = _VIDEO_META_SOURCES[f.filter_type]
+                clauses.append(
+                    f"EXISTS (SELECT 1 FROM videos v WHERE v.video_id = k.video_id "
+                    f"AND v.{col} && %s::text[])"
+                )
+                params.append(list(_as_list(f.value)))
             else:
                 raise ValueError(f"unsupported filter_type: {f.filter_type!r}")
         return " AND ".join(clauses), params

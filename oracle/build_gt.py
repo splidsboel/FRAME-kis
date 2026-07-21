@@ -100,6 +100,60 @@ FILTER_SOURCES = {
 # thresholds machinery entirely.
 PATTERN_TYPE = "pattern-match"
 
+# Video-level metadata filtering is a THIRD shape: set-overlap against a curated
+# ARRAY column on the parent `videos` row (joined by video_id), with NO confidence
+# floor — V3C ships these per-video `categories`/`tags` as dataset facets, not model
+# outputs, so there is nothing to threshold. Broad by nature (a category can span
+# 1%→30% of the corpus), which is exactly why they exercise the planner's
+# selectivity estimate. Column comes from this dict, never from item data.
+VIDEO_META_SOURCES = {
+    "video-category": "categories",
+    "video-tag": "tags",
+}
+
+
+def _meta_values(f):
+    """Normalize a video-metadata filter's `value` to a non-empty list of strings.
+    A single string or a list is accepted; op must be set-overlap ('in'/'contains')."""
+    if f.get("op") not in ("in", "contains"):
+        raise ValueError(
+            f"{f['filter_type']} filter op '{f.get('op')}' not supported (use 'in'/'contains')")
+    val = f["value"]
+    vals = [val] if isinstance(val, str) else list(val)
+    vals = [v for v in vals if v]
+    if not vals:
+        raise ValueError(f"{f['filter_type']} filter has empty value")
+    return vals
+
+
+def video_meta_diagnostics(cur, f, target_kf_ids, total):
+    """t-independent diagnostics for a video-level category/tag filter.
+
+    Like OCR pattern-match (and unlike the side-table label filters) there is no
+    confidence-threshold curve — set-overlap against a curated per-video array is a
+    single selectivity number plus whether the target video carries the facet.
+    """
+    col = VIDEO_META_SOURCES[f["filter_type"]]
+    vals = _meta_values(f)
+    cur.execute(
+        f"SELECT count(*) FROM keyframes k WHERE EXISTS "
+        f"(SELECT 1 FROM videos v WHERE v.video_id = k.video_id AND v.{col} && %s::text[])",
+        [vals])
+    kept = cur.fetchone()[0]
+    target_has_match = None
+    if target_kf_ids:
+        cur.execute(
+            f"SELECT 1 FROM keyframes k JOIN videos v ON v.video_id = k.video_id "
+            f"WHERE k.keyframe_id = ANY(%s) AND v.{col} && %s::text[] LIMIT 1",
+            [target_kf_ids, vals])
+        target_has_match = cur.fetchone() is not None
+    return {
+        "filter_type": f["filter_type"],
+        "values": f["value"],
+        "target_has_match": target_has_match,
+        "selectivity": kept / total if total else None,
+    }
+
 
 def _pattern_likes(f):
     """Normalize a pattern-match filter's `value` to LIKE patterns (`%substr%`).
@@ -150,7 +204,7 @@ def filter_ready(f, thresholds):
     ft = f["filter_type"]
     if ft in FILTER_SOURCES:
         return thresholds.get(ft) is not None
-    if ft == PATTERN_TYPE:
+    if ft == PATTERN_TYPE or ft in VIDEO_META_SOURCES:
         return True
     return False
 
@@ -281,6 +335,13 @@ def predicate_to_sql(filters, thresholds):
                 f"EXISTS (SELECT 1 FROM keyframe_ocr o WHERE o.keyframe_id = k.keyframe_id "
                 f"AND ({ors}))")
             params += likes
+        elif ft in VIDEO_META_SOURCES:
+            # set-overlap against the parent video's curated array; no confidence floor.
+            col = VIDEO_META_SOURCES[ft]
+            clauses.append(
+                f"EXISTS (SELECT 1 FROM videos v WHERE v.video_id = k.video_id "
+                f"AND v.{col} && %s::text[])")
+            params.append(_meta_values(f))
         else:
             raise ValueError(f"no oracle SQL for filter_type '{ft}' yet")
     return (" AND ".join(clauses) if clauses else "TRUE"), params
@@ -419,6 +480,9 @@ def main():
             ft = f["filter_type"]
             if ft == PATTERN_TYPE:
                 diags.append(ocr_pattern_diagnostics(cur, f, tkfs, total))
+                continue
+            if ft in VIDEO_META_SOURCES:
+                diags.append(video_meta_diagnostics(cur, f, tkfs, total))
                 continue
             if ft not in FILTER_SOURCES:
                 diags.append({"filter_type": ft, "note": "no GT support yet"})
