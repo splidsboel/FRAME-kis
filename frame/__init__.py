@@ -7,6 +7,7 @@ and Analyzer are shared.
 
 from .core.adapter import VectorDBAdapter
 from .core.analyzer import Analyzer
+from .core.profile import Profiler, SelectivityProfile
 from .core.runner import Runner
 from .core.schema import (
     GroundTruth,
@@ -22,6 +23,8 @@ __all__ = [
     "VectorDBAdapter",
     "Runner",
     "Analyzer",
+    "Profiler",
+    "SelectivityProfile",
     "Predicate",
     "QueryItem",
     "GroundTruth",

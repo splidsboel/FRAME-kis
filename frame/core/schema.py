@@ -59,7 +59,10 @@ class GroundTruth:
     target_passes_filter: bool | None
     filter_selectivity: list[float | None]
     gt_filtered: list[str] | None      # exact filtered k-NN keyframe ids (ranked)
-    gt_nofilter: list[str] | None      # exact unfiltered k-NN keyframe ids (ranked)
+    gt_nofilter: list[str] | None      # exact unfiltered k-NN keyframe ids (ranked, RAW query text)
+    gt_vec_nofilter: list[str] | None  # exact unfiltered k-NN of the vector_query (no filter);
+                                       # the neighbour list the filtered HNSW walk actually traverses,
+                                       # used by the profiler for near-query pass-rate
 
     @property
     def is_scorable(self) -> bool:
@@ -77,6 +80,7 @@ class GroundTruth:
             filter_selectivity=c.get("filter_selectivity") or [],
             gt_filtered=c.get("geometric_gt_filtered"),
             gt_nofilter=c.get("geometric_gt_nofilter"),
+            gt_vec_nofilter=c.get("geometric_gt_vec_nofilter"),
         )
 
 
