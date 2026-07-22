@@ -11,20 +11,8 @@
   },
   "raw_query_text": "a man with a green jacket and a black helmet snowboarding down a street towards a house",
   "decomposition": {
-    "vector_query": "man snowboarding",
-    "filters": [
-      {
-        "filter_type": "object",
-        "attribute": "object_label",
-        "op": "contains",
-        "value": [
-          "snowboard"
-        ],
-        "vocab": "yoloworld-open-vocab",
-        "mapping_source": "object_vocab.txt",
-        "verified": false
-      }
-    ],
+    "vector_query": "a man in a green jacket and black helmet snowboarding down a street towards a house",
+    "filters": [],
     "method": "manual",
     "verified": false
   },
@@ -325,5 +313,5 @@
       "text": "man with backpack and green jacket outside riding snowboard on street pants not visible"
     }
   ],
-  "notes": "Real VBS2026 KIS-C task, 58 real user query formulations (5 PraK users + Exquisitor) for one V3C1 target. Filterable signals: object=snowboard, scene=snow/street/outdoor. Also present but not currently filterable: color (green jacket), person (man), object (car, gate, house). Phrasing-variance case: same GT, many real phrasings -> measure recall@k spread under filtering. KEYFRAME-SAMPLING-ARTIFACT HARM EXEMPLAR (build_gt 2026-07-12, job 99295; keyframes inspected 2026-07-22): the object=snowboard filter is HARMFUL -- YOLO-World detects NO snowboard on the target keyframes (00358_00058/59/60), target_best_match conf=0.0, so target_passes_filter=false and filtered recall@k=0 at every threshold, even though snowboard fires elsewhere in the corpus (selectivity 0.79% at t=0.30). RESOLVED 2026-07-22 by keyframe inspection (shots 58/59/60 of video 00358): the target RKFs are POV selfie-stick shots -- the rider holds a camera on a pole pointed back at his torso, framing the green jacket, magenta backpack, chalet and a parked gray car, while the snowboard sits at his feet at/below the bottom frame edge and is NOT in frame. So YOLO-World's conf=0.0 is CORRECT (no board to detect), NOT a detector recall miss. This is therefore a KEYFRAME-SAMPLING ARTIFACT: the discriminative object was never in the sampled keyframe, so a hard object=snowboard filter can never legitimately be satisfied on the target. Distinct from q0003 (scene-taxonomy divergence: correct scene, mislabeled by Places365) and from a true detector miss (object visible, detector fails to fire) -- akin instead to the POV/out-of-frame semantic-only cases q0017/q0028. object.verified stays FALSE. DECOMPOSITION HARM confirmed and extreme, independent of the filter: raw_query_text ranks target at 20, but stripped vector_query 'man snowboarding' ranks it at 10154 (508x worse). DECISION PENDING: keep as a sampling-artifact filter-harm exemplar, or demote to semantic-only (drop the snowboard filter) like q0017/q0028."
+  "notes": "Real VBS2026 KIS-C task, 58 real user query formulations (5 PraK users + Exquisitor) for one V3C1 target. Filterable signals: object=snowboard, scene=snow/street/outdoor. Also present but not currently filterable: color (green jacket), person (man), object (car, gate, house). Phrasing-variance case: same GT, many real phrasings -> measure recall@k spread under filtering. KEYFRAME-SAMPLING-ARTIFACT HARM EXEMPLAR (build_gt 2026-07-12, job 99295; keyframes inspected 2026-07-22): the object=snowboard filter is HARMFUL -- YOLO-World detects NO snowboard on the target keyframes (00358_00058/59/60), target_best_match conf=0.0, so target_passes_filter=false and filtered recall@k=0 at every threshold, even though snowboard fires elsewhere in the corpus (selectivity 0.79% at t=0.30). RESOLVED 2026-07-22 by keyframe inspection (shots 58/59/60 of video 00358): the target RKFs are POV selfie-stick shots -- the rider holds a camera on a pole pointed back at his torso, framing the green jacket, magenta backpack, chalet and a parked gray car, while the snowboard sits at his feet at/below the bottom frame edge and is NOT in frame. So YOLO-World's conf=0.0 is CORRECT (no board to detect), NOT a detector recall miss. This is therefore a KEYFRAME-SAMPLING ARTIFACT: the discriminative object was never in the sampled keyframe, so a hard object=snowboard filter can never legitimately be satisfied on the target. Distinct from q0003 (scene-taxonomy divergence: correct scene, mislabeled by Places365) and from a true detector miss (object visible, detector fails to fire) -- akin instead to the POV/out-of-frame semantic-only cases q0017/q0028. object.verified stays FALSE. DECISION 2026-07-22: DEMOTED to semantic-only -- snowboard filter dropped and vector_query restored to the full description ('a man in a green jacket and black helmet snowboarding down a street towards a house'), like q0017/q0028, since the filter can never legitimately be satisfied on the target. Historical rationale for abandoning the object=snowboard decomposition: under the old stripped decomposition, raw_query_text ranked the target at 20 but the stripped vector_query 'man snowboarding' ranked it at 10154 (508x worse) -- extreme decomposition harm on top of a filter that excludes the target."
 }
