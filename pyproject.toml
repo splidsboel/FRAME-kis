@@ -29,3 +29,8 @@ packages = ["frame", "frame.core", "frame.adapters"]
 
 [dependency-groups]
 dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+# Unit suite covers the pure-logic harness core only (no live DB / torch / HPC).
+testpaths = ["tests"]
+addopts = "-ra -q"
