@@ -107,6 +107,7 @@ queryset/                  authored query set (source of truth) + build.py
   queries/*.json
 oracle/                    build_gt.py — exact ground-truth computation
 scripts/                   one-off analysis probes (profile_queryset, author_probe) + SLURM wrappers
+tests/                     unit tests for the harness core (run with `uv run pytest`)
 data/                      generated artifacts (gitignored)
 logs/                      SLURM job output *.out (gitignored)
 build_gt.sh                batch job for the oracle
@@ -131,6 +132,21 @@ root (e.g. `sbatch build_gt.sh …`, `sbatch scripts/author_probe.sh …`).
   the semantic remainder and applies predicates; the unfiltered condition embeds
   the full original query with no predicate.
 - Adapters return **ranked ids only** — sufficient for Recall@k and MRR.
+
+## Tests
+
+The pure-logic core (schema, analyzer, runner, profiler, adapter contract, caching
+encoder, and the query-set validator) is covered by a fast unit suite:
+
+```bash
+uv sync            # core harness + pytest (dev group); no heavy extras needed
+uv run pytest
+```
+
+The suite needs no live database, GPU, or model download — the DB adapter
+(`pgvector` → Postgres), the real `SiglipEncoder` (torch), and the oracle GT build
+(HPC/GPU) are integration concerns and are out of scope here. CI runs the same
+command on every push to `main` and every PR (`.github/workflows/tests.yml`).
 
 ## Status
 
