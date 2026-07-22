@@ -106,10 +106,15 @@ frame/                     harness package
 queryset/                  authored query set (source of truth) + build.py
   queries/*.json
 oracle/                    build_gt.py — exact ground-truth computation
+scripts/                   one-off analysis probes (profile_queryset, author_probe) + SLURM wrappers
 data/                      generated artifacts (gitignored)
+logs/                      SLURM job output *.out (gitignored)
 build_gt.sh                batch job for the oracle
-run_benchmark.py           run + score a system end-to-end
+run_benchmark.py / .sh     run + score a system end-to-end
 ```
+
+All SLURM wrappers write their `.out` to `logs/` and are submitted from the repo
+root (e.g. `sbatch build_gt.sh …`, `sbatch scripts/author_probe.sh …`).
 
 ## Design notes
 

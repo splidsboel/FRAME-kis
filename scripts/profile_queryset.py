@@ -2,7 +2,7 @@
 """
 profile_queryset.py — selectivity / plan profile of the authored query set.
 
-    uv run python profile_queryset.py --system pgvector
+    uv run python scripts/profile_queryset.py --system pgvector
 
 For each filtered item, reports where its REAL VBS filter lands on pgvector's
 exact↔approximate cutover: true global selectivity, the plan the planner picks
@@ -20,14 +20,19 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
+
+# scripts/ lives one level below the repo root; put the root on sys.path so the
+# `frame` package imports whether run via uv, conda, or a bare python3.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)
 
 from frame import Profiler, load_query_set
 from frame.adapters import PgvectorAdapter
 from frame.core.encode import CachingEncoder, SiglipEncoder
 from frame.core.profile import write_jsonl
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(HERE, "data")
+DATA = os.path.join(REPO, "data")
 
 ADAPTERS = {
     "pgvector": PgvectorAdapter,
@@ -49,7 +54,7 @@ def main():
     args = ap.parse_args()
 
     items = load_query_set(args.bench)
-    print(f"loaded {len(items)} items from {os.path.relpath(args.bench, HERE)}")
+    print(f"loaded {len(items)} items from {os.path.relpath(args.bench, REPO)}")
 
     encoder = CachingEncoder(SiglipEncoder())
     profiler = Profiler(ADAPTERS[args.system](), encoder,
@@ -62,7 +67,7 @@ def main():
     out = os.path.join(DATA, f"profile.{args.system}.jsonl")
     write_jsonl(profiles, out, args.system)
     print()
-    print(f"profile -> {os.path.relpath(out, HERE)}")
+    print(f"profile -> {os.path.relpath(out, REPO)}")
 
 
 if __name__ == "__main__":

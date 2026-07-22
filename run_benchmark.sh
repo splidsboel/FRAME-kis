@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=01:00:00
-#SBATCH --output=frame_run_%j.out
+#SBATCH --output=logs/frame_run_%j.out
 
 # Run a system end-to-end and score it. Like build_gt.sh it needs the V3C postgres
 # (started in-job via Apptainer) and the conda `embeddings` env (torch/transformers/

@@ -1,7 +1,9 @@
 # Generated artifacts — regenerate via queryset/build.py + oracle/build_gt.py
 data/*.jsonl
+data/*.json            # probe dumps (author_probe.json, *.unions.json)
+candidates*.json       # scripts/author_probe.py --unions input (one-off, regenerable)
 
-# SLURM job output
+# SLURM job output — routed to logs/ by every *.sh (logs/.gitkeep is tracked)
 *.out
 slurm-*.out
 

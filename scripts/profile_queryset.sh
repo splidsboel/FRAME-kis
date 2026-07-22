@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=frame_profile_%j.out
+#SBATCH --output=logs/frame_profile_%j.out
 
 # Selectivity / plan profile of the authored query set. Same in-job postgres +
 # conda `embeddings` setup as run_benchmark.sh (read that for details). Reads the
@@ -12,8 +12,8 @@
 # the near-query pass-rate needs geometric_gt_vec_nofilter from the GT.
 #
 # Submit from the repo root:
-#     sbatch profile_queryset.sh                          # defaults: --system pgvector
-#     sbatch profile_queryset.sh --k 1000 --near-query-n 100
+#     sbatch scripts/profile_queryset.sh                          # defaults: --system pgvector
+#     sbatch scripts/profile_queryset.sh --k 1000 --near-query-n 100
 # Extra args pass straight through to profile_queryset.py.
 
 set -euo pipefail
@@ -48,7 +48,7 @@ export PGDATABASE="postgres"
 
 cd "$PROJECT_DIR"   # so `import frame` resolves and data/ paths line up
 echo "[$(date)] Running profile_queryset.py $* ..."
-python3 -u profile_queryset.py "$@"
+python3 -u scripts/profile_queryset.py "$@"
 
 echo "[$(date)] Stopping postgres..."
 apptainer exec --bind /dev/shm --bind /tmp "$SIF" pg_ctl stop -D "$PGDATA" -m fast

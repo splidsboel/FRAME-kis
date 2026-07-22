@@ -4,15 +4,15 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=00:30:00
-#SBATCH --output=frame_authorprobe_%j.out
+#SBATCH --output=logs/frame_authorprobe_%j.out
 
 # DB inputs for authoring disjunctive KIS queries (step 1 of the cutover work).
 # Same in-job postgres pattern as profile_queryset.sh — read that for details.
 # No GPU / conda needed: this probe is pure SQL (psycopg2 only).
 #
-# Submit from the repo root:
-#     sbatch author_probe.sh                       # survey: global sel + per-target labels
-#     sbatch author_probe.sh --unions candidates.json   # verify chosen union selectivities
+# Submit from the repo root (so logs/ and data/ resolve):
+#     sbatch scripts/author_probe.sh                          # survey: global sel + per-target labels
+#     sbatch scripts/author_probe.sh --unions candidates.json # verify chosen union selectivities
 
 set -euo pipefail
 
@@ -45,8 +45,8 @@ export PGUSER="postgres"
 export PGDATABASE="postgres"
 
 cd "$PROJECT_DIR"   # so queryset/ and data/ paths line up
-echo "[$(date)] Running author_probe.py $* ..."
-python3 -u author_probe.py "$@"
+echo "[$(date)] Running scripts/author_probe.py $* ..."
+python3 -u scripts/author_probe.py "$@"
 
 echo "[$(date)] Stopping postgres..."
 apptainer exec --bind /dev/shm --bind /tmp "$SIF" pg_ctl stop -D "$PGDATA" -m fast

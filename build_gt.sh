@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=03:00:00
-#SBATCH --output=build_gt_%j.out
+#SBATCH --output=logs/build_gt_%j.out
 
 # Enrich data/benchmark.jsonl with DB-computed ground truth. Needs BOTH a GPU
 # (SigLIP text encoder) and the V3C postgres, so it starts the in-job postgres,

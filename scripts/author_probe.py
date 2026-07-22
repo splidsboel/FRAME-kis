@@ -41,9 +41,10 @@ import sys
 
 import psycopg2
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-QUERIES = os.path.join(HERE, "queryset", "queries")
-OUT = os.path.join(HERE, "data", "author_probe.json")
+# scripts/ lives one level below the repo root.
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+QUERIES = os.path.join(REPO, "queryset", "queries")
+OUT = os.path.join(REPO, "data", "author_probe.json")
 
 # Pinned fairness thresholds (CLAUDE.md / build_gt.py): scene 0.10, object 0.30.
 THRESH = {"object": 0.30, "scene": 0.10}
@@ -217,7 +218,7 @@ def main():
     out = OUT if not unions_path else OUT.replace(".json", ".unions.json")
     with open(out, "w") as f:
         json.dump(report, f, indent=2)
-    print(f"\n[done] wrote {os.path.relpath(out, HERE)}")
+    print(f"\n[done] wrote {os.path.relpath(out, REPO)}")
 
 
 if __name__ == "__main__":
