@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --output=build_gt_%j.out
 
 # Enrich data/benchmark.jsonl with DB-computed ground truth. Needs BOTH a GPU
