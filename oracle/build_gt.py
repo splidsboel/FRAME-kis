@@ -274,6 +274,23 @@ def selectivity_curve(cur, table, labels, total):
     return curve
 
 
+def label_selectivity(cur, table, labels, total, t):
+    """Corpus fraction kept by `label IN labels at conf >= t` at ONE threshold.
+
+    The single-number summary behind `filter_selectivity` for a side-table filter
+    (the curve above is the diagnostic; this is the value at the pinned threshold).
+    Returns None when no threshold is set for this filter type yet.
+    """
+    if t is None:
+        return None
+    cur.execute(
+        f"SELECT count(DISTINCT keyframe_id) FROM {table} "
+        "WHERE label = ANY(%s) AND confidence >= %s",
+        (labels, t),
+    )
+    return cur.fetchone()[0] / total if total else None
+
+
 def target_passes(cur, target_kf_ids, filters, thresholds):
     """Does at least one target keyframe satisfy the FULL (conjunctive) predicate?
 
@@ -474,18 +491,28 @@ def main():
         c["target_keyframe_ids"] = tkfs
         c.pop("_pending", None)
 
-        # per-filter diagnostics (t-independent)
+        # per-filter diagnostics (t-independent) + the single-number summary
+        # selectivity per filter (filter_selectivity, one entry per filter, in
+        # filter order): pattern/video-meta are threshold-independent so it's
+        # always the corpus fraction they keep; scene/object are evaluated at the
+        # pinned threshold (None until that filter type's threshold flag is set).
         diags = []
+        sels = []
         for f in filters:
             ft = f["filter_type"]
             if ft == PATTERN_TYPE:
-                diags.append(ocr_pattern_diagnostics(cur, f, tkfs, total))
+                d = ocr_pattern_diagnostics(cur, f, tkfs, total)
+                diags.append(d)
+                sels.append(d["selectivity"])
                 continue
             if ft in VIDEO_META_SOURCES:
-                diags.append(video_meta_diagnostics(cur, f, tkfs, total))
+                d = video_meta_diagnostics(cur, f, tkfs, total)
+                diags.append(d)
+                sels.append(d["selectivity"])
                 continue
             if ft not in FILTER_SOURCES:
                 diags.append({"filter_type": ft, "note": "no GT support yet"})
+                sels.append(None)
                 continue
             table = FILTER_SOURCES[ft][0]
             labels = f["value"]
@@ -495,7 +522,9 @@ def main():
                 "target_best_match": target_best_match(cur, table, tkfs, labels),
                 "selectivity_vs_threshold": selectivity_curve(cur, table, labels, total),
             })
+            sels.append(label_selectivity(cur, table, labels, total, thresholds.get(ft)))
         c["filter_diagnostics"] = diags
+        c["filter_selectivity"] = sels
 
         # unfiltered GT (t-independent). Two no-filter baselines so the filter's
         # effect can be isolated: *_nofilter uses the raw query text (naive
