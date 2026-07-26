@@ -9,6 +9,7 @@ from .core.adapter import VectorDBAdapter
 from .core.analyzer import Analyzer
 from .core.profile import Profiler, SelectivityProfile
 from .core.runner import Runner
+from .core.sweep import Sweeper, SweepCell
 from .core.schema import (
     GroundTruth,
     Metrics,
@@ -25,6 +26,8 @@ __all__ = [
     "Analyzer",
     "Profiler",
     "SelectivityProfile",
+    "Sweeper",
+    "SweepCell",
     "Predicate",
     "QueryItem",
     "GroundTruth",

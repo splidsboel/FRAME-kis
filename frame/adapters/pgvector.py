@@ -217,6 +217,37 @@ class PgvectorAdapter(VectorDBAdapter):
         plan_tree = (json.loads(raw) if isinstance(raw, str) else raw)[0]["Plan"]
         return _classify_plan(plan_tree), _estimated_passing_rows(plan_tree)
 
+    def set_session_knobs(
+        self,
+        ef_search: int | None = None,
+        iterative_scan: str | None = None,
+        enable_seqscan: bool | None = None,
+    ) -> None:
+        """Diagnostic — NOT part of the fair run contract. Re-apply search-time
+        session GUCs on the LIVE connection without a fresh setup()/ANALYZE, so the
+        cutover sweep (frame.core.sweep) can walk the ef_search × iterative_scan grid
+        on ONE connection and pay the pinned ANALYZE state only once.
+
+        `enable_seqscan=False` is the FORCE-HNSW counterfactual: it pushes filters
+        the planner would otherwise run exactly (seqscan) onto the approximate HNSW
+        index path, exposing the approximate recall penalty across the FULL
+        selectivity range — not just the few broad filters the planner naturally
+        routes to the index. (Session-wide, so side-table subplans are affected too;
+        we only rely on the keyframes ORDER BY taking the HNSW index — confirm via
+        plan_choice, which reflects this session state.) See the vault note
+        'FRAME — pgvector planner split'. Updates the instance attrs so explain()/
+        plan_choice()'s mode-restore stays consistent."""
+        assert self._conn is not None, "call setup() first"
+        with self._conn.cursor() as cur:
+            if ef_search is not None:
+                self.ef_search = ef_search
+                cur.execute("SET hnsw.ef_search = %s;", (ef_search,))
+            if iterative_scan is not None:
+                self.iterative_scan = iterative_scan
+                cur.execute("SET hnsw.iterative_scan = %s;", (iterative_scan,))
+            if enable_seqscan is not None:
+                cur.execute("SET enable_seqscan = %s;", ("on" if enable_seqscan else "off",))
+
     # ── predicate translation (system-under-test side) ──
     def _build_filters(self, filters: Sequence[Predicate]) -> tuple[str, list]:
         """WHERE fragment (or empty string) for the AND-ed predicate."""

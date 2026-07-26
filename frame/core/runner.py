@@ -36,6 +36,32 @@ DEFAULT_WARMUP = 1
 DEFAULT_REPEAT = 5
 
 
+def timed_search(
+    adapter: VectorDBAdapter,
+    vec,
+    filters: Sequence[Predicate],
+    k: int,
+    warmup: int = DEFAULT_WARMUP,
+    repeat: int = DEFAULT_REPEAT,
+) -> tuple[list[str], float]:
+    """Warm the query, then return (ranked_ids, median latency in ms).
+
+    Shared by the Runner and the cutover Sweeper so both measure latency the same
+    way: `warmup` untimed passes prime the plan cache + OS/postgres buffers, then
+    the median of `repeat` timed passes is the query's warm cost. Ranked ids are
+    from the last pass and are stable across trials (deterministic given fixed
+    ef_search)."""
+    ids: list[str] = []
+    for _ in range(max(0, warmup)):
+        ids = adapter.search(vec, filters, k)
+    samples: list[float] = []
+    for _ in range(max(1, repeat)):
+        t0 = perf_counter()
+        ids = adapter.search(vec, filters, k)
+        samples.append((perf_counter() - t0) * 1000.0)
+    return ids, median(samples)
+
+
 class Runner:
     def __init__(
         self,
@@ -73,12 +99,6 @@ class Runner:
         self, vec, filters: Sequence[Predicate], k: int
     ) -> tuple[list[str], float]:
         """Warm the query, then return (ranked_ids, median latency in ms)."""
-        ids: list[str] = []
-        for _ in range(self.warmup):
-            ids = self.adapter.search(vec, filters, k)
-        samples: list[float] = []
-        for _ in range(self.repeat):
-            t0 = perf_counter()
-            ids = self.adapter.search(vec, filters, k)
-            samples.append((perf_counter() - t0) * 1000.0)
-        return ids, median(samples)
+        return timed_search(
+            self.adapter, vec, filters, k, warmup=self.warmup, repeat=self.repeat
+        )
