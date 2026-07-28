@@ -68,6 +68,11 @@ def connect():
         sys.exit("PGHOST not set — run from data_stats.sh (in-job postgres socket).")
     conn = psycopg2.connect(host=host, port=5432, user="postgres", dbname="postgres")
     conn.autocommit = True
+    # The DB is SQL_ASCII, so psycopg2 would decode text as ASCII and choke on the
+    # non-ASCII bytes in curated video metadata (e.g. Cyrillic Vimeo channel names).
+    # Force UTF-8 decoding on the client side; the label vocabularies are ASCII so
+    # this only matters for the video-metadata block.
+    conn.set_client_encoding("UTF8")
     return conn
 
 
@@ -272,7 +277,6 @@ def main():
         "distributions": {},
         "per_keyframe": {},
         "confidence": {},
-        "video_metadata": video_metadata(cur),
     }
 
     # block 2 — per-label distributions (raw + pinned), full vocab -> CSV
@@ -311,6 +315,16 @@ def main():
               co["pairs"], ["scene", "object", "kf", "selectivity"])
     print(f"[cooc] {len(scene_set)}x{len(object_set)} label grid: "
           f"{co['n_present']}/{co['n_possible']} pairs co-occur, {co['n_empty']} empty")
+
+    # block 6 — video-level metadata (Omar's "extra metadata to filter on"). Free
+    # text, so guard it: a stray undecodable byte must never sink the core report.
+    try:
+        report["video_metadata"] = video_metadata(cur)
+        print(f"[video] {len(report['video_metadata'].get('categories', []))} categories, "
+              f"{len(report['video_metadata'].get('tags', []))} tags")
+    except UnicodeDecodeError as e:
+        print(f"[warn] video_metadata skipped (text decode): {e}")
+        report["video_metadata"] = {"error": f"decode: {e}"}
 
     out = os.path.join(DATA, "data_stats.json")
     with open(out, "w") as f:
