@@ -48,6 +48,7 @@ class SelectivityProfile:
     filter_summary: str                 # e.g. "object:{fish,hat}"
     n_filters: int
     corpus_size: int
+    per_filter: list[dict]              # each part alone: {summary, count, selectivity}
     global_count: int                   # true passing keyframes (full conjunction)
     global_selectivity: float           # global_count / corpus_size
     plan: str                           # "hnsw" | "seqscan" | "other"
@@ -64,12 +65,25 @@ class SelectivityProfile:
             return None
         return self.global_selectivity - self.near_query_pass_rate
 
+    @property
+    def tightening(self) -> float | None:
+        """How much narrower the AND-ed conjunction is than its tightest single
+        part: min(part selectivity) / conjunction selectivity (≥ 1). 1.0 for a
+        single-filter query; >1 quantifies what the extra conjuncts buy. None when
+        the conjunction passes nothing."""
+        parts = [p["selectivity"] for p in self.per_filter if p["selectivity"] is not None]
+        if not parts or self.global_selectivity <= 0:
+            return None
+        return min(parts) / self.global_selectivity
+
     def to_dict(self) -> dict:
         return {
             "query_id": self.query_id,
             "filter_summary": self.filter_summary,
             "n_filters": self.n_filters,
             "corpus_size": self.corpus_size,
+            "per_filter": self.per_filter,
+            "tightening": self.tightening,
             "global_count": self.global_count,
             "global_selectivity": self.global_selectivity,
             "plan": self.plan,
@@ -117,6 +131,20 @@ class Profiler:
         global_count = self.adapter.count_passing(item.filters)
         plan, est_rows = self.adapter.plan_choice(vec, item.filters, self.k)
 
+        # Each filter part ALONE — the selectivity of each predicate on its own,
+        # so a conjunction can be read as "part vs part vs both" (Omar, meeting
+        # 2026-07-20). Same count_passing path as the conjunction, so the numbers
+        # are directly comparable. For a single-filter query this is one entry
+        # equal to the conjunction.
+        per_filter = []
+        for f in item.filters:
+            c = self.adapter.count_passing([f])
+            per_filter.append({
+                "summary": _summarize_filters([f]),
+                "count": c,
+                "selectivity": (c / corpus) if corpus else None,
+            })
+
         # near-query pass-rate over the exact unfiltered neighbours of vector_query
         # (the list the filtered HNSW walk traverses). Absent until an --all-baselines
         # GT run has populated geometric_gt_vec_nofilter.
@@ -133,6 +161,7 @@ class Profiler:
             filter_summary=_summarize_filters(item.filters),
             n_filters=len(item.filters),
             corpus_size=corpus,
+            per_filter=per_filter,
             global_count=global_count,
             global_selectivity=(global_count / corpus) if corpus else 0.0,
             plan=plan,
@@ -180,6 +209,17 @@ class Profiler:
                 f"note: {len(profiles) - len(scored)} item(s) lack vec-nofilter GT "
                 f"→ near-query pass-rate n/a (run build_gt with vec-nofilter baseline)"
             )
+        # conjunction decomposition — each part alone vs the AND-ed whole (Omar).
+        conj = [p for p in profiles if p.n_filters > 1]
+        if conj:
+            lines += ["-" * 92, "conjunctions — each part alone vs conjunction (selectivity):"]
+            for p in conj:
+                parts = "  ".join(
+                    f"{f['summary'][:24]}={f['selectivity']*100:.3f}%" for f in p.per_filter)
+                tight = f"{p.tightening:.1f}x" if p.tightening is not None else "n/a"
+                lines.append(
+                    f"  {p.query_id}: {parts}  →  AND={p.global_selectivity*100:.3f}% "
+                    f"(tightens {tight})")
         return "\n".join(lines)
 
 

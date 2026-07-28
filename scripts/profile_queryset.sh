@@ -50,6 +50,11 @@ cd "$PROJECT_DIR"   # so `import frame` resolves and data/ paths line up
 echo "[$(date)] Running profile_queryset.py $* ..."
 python3 -u scripts/profile_queryset.py "$@"
 
+echo "[$(date)] Plotting query-set selectivity (best-effort; needs matplotlib) ..."
+python3 -u scripts/plot_query_selectivity.py \
+    --in data/profile.pgvector.jsonl --out results/figures \
+    || echo "[warn] plotting skipped — run scripts/plot_query_selectivity.py locally with the viz extra."
+
 echo "[$(date)] Stopping postgres..."
 apptainer exec --bind /dev/shm --bind /tmp "$SIF" pg_ctl stop -D "$PGDATA" -m fast
 wait "$PG_PID" 2>/dev/null || true

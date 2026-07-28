@@ -69,6 +69,7 @@ def test_summarize_conjunction():
 def test_divergence_positive_when_global_overstates():
     p = SelectivityProfile(
         query_id="q", filter_summary="s", n_filters=1, corpus_size=1000,
+        per_filter=[{"summary": "s", "count": 200, "selectivity": 0.2}],
         global_count=200, global_selectivity=0.2, plan="hnsw", planner_est_rows=200,
         near_query_n=100, near_query_passes=5, near_query_pass_rate=0.05,
     )
@@ -78,6 +79,7 @@ def test_divergence_positive_when_global_overstates():
 def test_divergence_none_without_near_query_rate():
     p = SelectivityProfile(
         query_id="q", filter_summary="s", n_filters=1, corpus_size=1000,
+        per_filter=[{"summary": "s", "count": 200, "selectivity": 0.2}],
         global_count=200, global_selectivity=0.2, plan="hnsw", planner_est_rows=200,
         near_query_n=0, near_query_passes=0, near_query_pass_rate=None,
     )
@@ -99,6 +101,10 @@ def test_profile_computes_selectivity_and_pass_rate(enriched_item, fake_encoder)
     assert p.global_selectivity == 0.1
     assert p.plan == "hnsw"
     assert p.planner_est_rows == 120
+    # per-part breakdown: one filter, its own selectivity, conjunction tightens 1x
+    assert len(p.per_filter) == 1
+    assert p.per_filter[0]["selectivity"] == 0.1
+    assert p.tightening == 1.0
     # enriched_item has 4 vec-nofilter neighbours; adapter says 1 passes
     assert p.near_query_n == 4
     assert p.near_query_passes == 1
