@@ -15,14 +15,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 
-import pyarrow as pa
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
+import pyarrow as pa   # AFTER torch: torch's newer libstdc++ must load before pyarrow's (GLIBCXX)
 
-import sys
 # scripts/ is one level below the repo root; put the root on sys.path for `import frame`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

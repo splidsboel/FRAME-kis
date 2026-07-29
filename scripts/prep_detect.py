@@ -19,12 +19,11 @@ import argparse
 import os
 import sys
 
-import pyarrow as pa
 import torch
 from PIL import Image
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
+import pyarrow as pa   # AFTER torch: torch's newer libstdc++ must load before pyarrow's (GLIBCXX)
 
-import sys
 # scripts/ is one level below the repo root; put the root on sys.path for `import frame`.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
