@@ -24,6 +24,10 @@ import torch
 from PIL import Image
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
+import sys
+# scripts/ is one level below the repo root; put the root on sys.path for `import frame`.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from frame.prep.common import (OWLV2_MODEL, OWLV2_SCORE_THRESHOLD, VOCAB_PATH,
                                atomic_write_parquet, is_done, iter_keyframes,
                                staged_path, video_dirs)

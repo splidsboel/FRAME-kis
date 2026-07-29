@@ -20,6 +20,10 @@ import numpy as np
 import pyarrow as pa
 from PIL import Image
 
+import sys
+# scripts/ is one level below the repo root; put the root on sys.path for `import frame`.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from frame.prep.common import (EASYOCR_MODEL_DIR, OCR_LANGS, SCHEMAS,
                                atomic_write_parquet, is_done, iter_keyframes,
                                staged_path, video_dirs)

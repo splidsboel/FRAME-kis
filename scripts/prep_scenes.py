@@ -22,6 +22,10 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
 
+import sys
+# scripts/ is one level below the repo root; put the root on sys.path for `import frame`.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from frame.prep.common import (PLACES_LABELS, PLACES_WEIGHTS, SCENE_TOP_K, SCHEMAS,
                                atomic_write_parquet, is_done, iter_keyframes,
                                staged_path, video_dirs)
