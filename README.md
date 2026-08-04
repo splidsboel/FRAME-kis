@@ -23,7 +23,7 @@ A benchmark run has two halves that meet at scoring:
 OFFLINE / ORACLE (system-agnostic, exact)      ONLINE / SYSTEM UNDER TEST
 queryset/queries/*.json                        data/benchmark.jsonl
    │ queryset/build.py                             │
-   ▼                                               ▼   adapter.setup()      (ingest)
+   ▼                                               ▼   adapter.setup()      (per run)
 data/benchmark.jsonl ──┐                     Runner(adapter, encoder).run()
    │ oracle/build_gt.py │                          │   adapter.search(vec, filters, k)
    ▼ (exact kNN; ground │                          ▼
@@ -76,15 +76,21 @@ ground-truth build needs), `viz` (plots).
 
 ## Adding your own system
 
-Implement two methods on `VectorDBAdapter` (`frame/core/adapter.py`):
+Implement three methods on `VectorDBAdapter` (`frame/core/adapter.py`):
 
 ```python
 class MyAdapter(VectorDBAdapter):
     name = "mysystem"
 
+    def load_data(self, dataset: Dataset) -> None:
+        # ONE-TIME ingest. Materialize the shared logical schema (a Tier-2
+        # canonical shard: parquet tables + an embeddings h5) into your system's
+        # own physical layout, then build the vector index. Must be idempotent.
+        ...
+
     def setup(self) -> None:
-        # connect; materialize the logical schema in your system's own layout;
-        # ensure a vector index exists.
+        # PER-RUN. Connect, verify the index exists, apply search-time knobs.
+        # Do NOT ingest here — raise if the data is missing.
         ...
 
     def search(self, query_vector, filters, k) -> list[str]:
@@ -93,7 +99,20 @@ class MyAdapter(VectorDBAdapter):
         ...
 ```
 
-Register it in `run_benchmark.py` and run. The shared `Runner` (drives the queries,
+`load_data()` is where the multi-table workaround lives: pgvector loads the
+normalized tables and JOINs; a system without joins must denormalize the same
+neutral files into one flat collection. Keeping it separate from `setup()` means
+a benchmark run never pays (or hides) a multi-million-row ingest.
+
+Ingest once, then run:
+
+```bash
+sbatch load_dataset.sh --dataset data/canonical/v3c1   # one-time, per system
+sbatch load_dataset.sh --check                         # verify your load_data()
+sbatch run_benchmark.sh --system mysystem              # per run
+```
+
+Register it in `run_benchmark.py` + `scripts/load_dataset.py` and run. The shared `Runner` (drives the queries,
 both conditions, timings) and `Analyzer` (scores against the oracle ground truth)
 are reused unchanged, so every system is measured the same way.
 
@@ -101,7 +120,7 @@ are reused unchanged, so every system is measured the same way.
 
 ```
 frame/                     harness package
-  core/    schema · adapter (ABC) · runner · analyzer · encode (shared encoder)
+  core/    schema · dataset (Tier-2 handle) · adapter (ABC) · runner · analyzer · encode
   adapters/  pgvector · (add your own)
 queryset/                  authored query set (source of truth) + build.py
   queries/*.json

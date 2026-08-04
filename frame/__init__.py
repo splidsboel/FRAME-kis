@@ -7,6 +7,7 @@ and Analyzer are shared.
 
 from .core.adapter import VectorDBAdapter
 from .core.analyzer import Analyzer
+from .core.dataset import Dataset
 from .core.profile import Profiler, SelectivityProfile
 from .core.runner import Runner
 from .core.sweep import Sweeper, SweepCell
@@ -22,6 +23,7 @@ from .core.schema import (
 
 __all__ = [
     "VectorDBAdapter",
+    "Dataset",
     "Runner",
     "Analyzer",
     "Profiler",

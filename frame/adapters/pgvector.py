@@ -7,12 +7,13 @@ computes exact truth (sequential scan, indexes off); this asks the real HNSW
 index and lives with its approximation. The gap between them is a result we
 measure — so the two must not share translation code.
 
-Physical layout: pgvector holds the normalised V3C schema (see V3C Schema.md), so
-`setup()` here is a connection + index sanity check + a pinned ANALYZE of every
-filter relation (fairness invariant — see _ANALYZE_TABLES) — the "ingest the logical
-schema" step is already satisfied by the existing V3C load. Filtering is done with
-native JOIN/EXISTS against the side tables. (Chroma/Milvus adapters will instead
-denormalise in their own setup() — that asymmetry is the research point.)
+Physical layout: pgvector holds the NORMALISED V3C schema (see V3C Schema.md).
+`load_data()` materialises a Tier-2 canonical shard into exactly that layout —
+one table per entity + the HNSW index — and `setup()` is then only a connection +
+index sanity check + a pinned ANALYZE of every filter relation (fairness
+invariant, see _ANALYZE_TABLES). Filtering is done with native JOIN/EXISTS against
+the side tables. (Chroma/Milvus adapters will instead denormalise in their own
+load_data() — that asymmetry is the research point.)
 
 FAIRNESS: confidence thresholds are PINNED (scene 0.10, object 0.30 — the values
 chosen in the query-set repo diagnostics) so every system filters over the same
@@ -30,6 +31,7 @@ from typing import Sequence
 import numpy as np
 
 from ..core.adapter import VectorDBAdapter
+from ..core.dataset import EMBED_DIM, Dataset
 from ..core.schema import Predicate
 
 # Pinned fairness thresholds (see query-set repo "Chosen confidence thresholds").
@@ -59,6 +61,85 @@ _VIDEO_META_SOURCES = {
 # constant estimate and always picks exact — masking the very cutover we measure.
 _ANALYZE_TABLES = ("keyframes", "scene_labels", "object_detections", "keyframe_ocr", "videos")
 
+# ── Physical layout materialised by load_data() ────────────────────────────────
+# DDL and index set reproduce V3C Schema.md EXACTLY. That fidelity is not
+# cosmetic: which indexes exist decides what the planner can choose, and the
+# seqscan↔HNSW cutover is precisely what this suite measures. Adding a helpful
+# index here would silently change the results, so don't — change the schema doc
+# first, deliberately.
+HNSW_M = 16
+HNSW_EF_CONSTRUCTION = 64
+
+_DDL = {
+    "videos": """
+        CREATE TABLE IF NOT EXISTS videos (
+            video_id    TEXT PRIMARY KEY, vimeo_id TEXT, title TEXT,
+            duration_s  DOUBLE PRECISION, width INTEGER, height INTEGER,
+            channel     TEXT, upload_date TEXT, license TEXT,
+            tags        TEXT[], categories TEXT[])""",
+    "shots": """
+        CREATE TABLE IF NOT EXISTS shots (
+            shot_id      TEXT PRIMARY KEY, video_id TEXT, shot_index INTEGER,
+            start_frame  INTEGER, end_frame INTEGER,
+            start_time_s DOUBLE PRECISION, end_time_s DOUBLE PRECISION)""",
+    "keyframes": f"""
+        CREATE TABLE IF NOT EXISTS keyframes (
+            keyframe_id TEXT PRIMARY KEY, shot_id TEXT, video_id TEXT,
+            frame_number INTEGER, embedding vector({EMBED_DIM}))""",
+    "keyframe_ocr": """
+        CREATE TABLE IF NOT EXISTS keyframe_ocr (
+            keyframe_id TEXT NOT NULL, span_index INTEGER NOT NULL,
+            text TEXT NOT NULL, confidence REAL NOT NULL,
+            PRIMARY KEY (keyframe_id, span_index))""",
+    "scene_labels": """
+        CREATE TABLE IF NOT EXISTS scene_labels (
+            keyframe_id TEXT NOT NULL, label TEXT NOT NULL,
+            confidence DOUBLE PRECISION NOT NULL,
+            PRIMARY KEY (keyframe_id, label))""",
+    "object_detections": """
+        CREATE TABLE IF NOT EXISTS object_detections (
+            id BIGINT PRIMARY KEY, keyframe_id TEXT NOT NULL, label TEXT NOT NULL,
+            confidence REAL NOT NULL, x1 REAL, y1 REAL, x2 REAL, y2 REAL)""",
+    "object_detection_done": """
+        CREATE TABLE IF NOT EXISTS object_detection_done (
+            keyframe_id TEXT PRIMARY KEY)""",
+}
+
+# Built AFTER the COPY (index-then-load is far slower, and the HNSW build in
+# particular must see the finished table).
+_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS shots_video_id_idx ON shots USING btree (video_id)",
+    "CREATE INDEX IF NOT EXISTS keyframes_video_id_idx ON keyframes USING btree (video_id)",
+    "CREATE INDEX IF NOT EXISTS keyframe_ocr_keyframe_id ON keyframe_ocr USING btree (keyframe_id)",
+    "CREATE INDEX IF NOT EXISTS keyframe_ocr_conf ON keyframe_ocr USING btree (confidence)",
+    "CREATE INDEX IF NOT EXISTS keyframe_ocr_text_trgm "
+    "ON keyframe_ocr USING gin (lower(text) gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS idx_scene_labels_keyframe_id ON scene_labels USING btree (keyframe_id)",
+    "CREATE INDEX IF NOT EXISTS idx_scene_labels_label ON scene_labels USING btree (label)",
+    "CREATE INDEX IF NOT EXISTS idx_object_detections_keyframe_id "
+    "ON object_detections USING btree (keyframe_id)",
+    "CREATE INDEX IF NOT EXISTS idx_object_detections_label ON object_detections USING btree (label)",
+    f"CREATE INDEX IF NOT EXISTS {'keyframes_embedding_hnsw_idx'} ON keyframes "
+    f"USING hnsw (embedding vector_cosine_ops) "
+    f"WITH (m='{HNSW_M}', ef_construction='{HNSW_EF_CONSTRUCTION}')",
+)
+
+# Columns COPYed per table, in parquet order. keyframes is absent on purpose: its
+# rows are assembled from the metadata parquet + the embeddings h5 (see
+# _load_keyframes), since the vector lives in a separate file.
+_COPY_COLUMNS = {
+    "videos": ("video_id", "vimeo_id", "title", "duration_s", "width", "height",
+               "channel", "upload_date", "license", "tags", "categories"),
+    "shots": ("shot_id", "video_id", "shot_index", "start_frame", "end_frame",
+              "start_time_s", "end_time_s"),
+    "keyframe_ocr": ("keyframe_id", "span_index", "text", "confidence"),
+    "scene_labels": ("keyframe_id", "label", "confidence"),
+    "object_detections": ("id", "keyframe_id", "label", "confidence", "x1", "y1", "x2", "y2"),
+    "object_detection_done": ("keyframe_id",),
+}
+
+_KEYFRAME_COLUMNS = ("keyframe_id", "shot_id", "video_id", "frame_number", "embedding")
+
 
 class PgvectorAdapter(VectorDBAdapter):
     name = "pgvector"
@@ -81,11 +162,174 @@ class PgvectorAdapter(VectorDBAdapter):
         self.iterative_scan = iterative_scan
         self._conn = None
 
-    def setup(self) -> None:
+    # ── one-time ingest (Tier 2 -> pgvector's physical layout) ──
+    def load_data(self, dataset: Dataset, force: bool = False) -> None:
+        """COPY a canonical shard into the normalised V3C tables, then build the
+        indexes. Idempotent: a table whose row count already matches the source
+        parquet is skipped; a partially-loaded one is truncated and redone (the
+        source is files, so a redo is always safe). `force=True` reloads
+        everything.
+
+        Streamed end to end — parquet row batches feed a COPY ... FROM STDIN, so
+        a 1.7M-keyframe shard loads in bounded memory. The one thing held whole is
+        the keyframe metadata dict (~4 small fields x N rows, a few hundred MB at
+        V3C scale), needed because vectors arrive from a separate file and must be
+        paired by id rather than by position."""
+        import psycopg2
+
+        dataset.validate()
+        own_conn = self._conn is None
+        if own_conn:
+            self._connect()
+        conn = self._conn
+        assert conn is not None
+
+        try:
+            print(f"[load] {dataset.name} -> pgvector ({dataset.path})", flush=True)
+            with conn.cursor() as cur:
+                cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                # pg_trgm backs keyframe_ocr_text_trgm (the pattern-match filter).
+                try:
+                    cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+                except psycopg2.Error as e:
+                    print(f"[load] WARNING: pg_trgm unavailable ({e}); "
+                          "the OCR trigram index will be skipped", flush=True)
+                for table, ddl in _DDL.items():
+                    cur.execute(ddl)
+
+            self._load_keyframes(dataset, force=force)
+            for table in _COPY_COLUMNS:
+                if dataset.has_table(table):
+                    self._copy_table(dataset, table, force=force)
+                else:
+                    print(f"[load] skip {table}: not in this shard", flush=True)
+
+            print("[load] building indexes (this is the slow part) ...", flush=True)
+            with conn.cursor() as cur:
+                for stmt in _INDEXES:
+                    try:
+                        cur.execute(stmt)
+                    except psycopg2.Error as e:
+                        # A missing extension (pg_trgm) must not sink the whole load.
+                        print(f"[load] WARNING: index failed: {e}", flush=True)
+                for table in _ANALYZE_TABLES:
+                    if _table_exists(cur, table):
+                        cur.execute(f"ANALYZE {table};")
+            print("[load] done", flush=True)
+        finally:
+            if own_conn:
+                self.teardown()
+
+    def _load_keyframes(self, dataset: Dataset, force: bool = False) -> None:
+        """keyframes rows = metadata parquet JOINed by id to the embeddings h5.
+
+        The h5 drives the loop because it is the big side and must stay streamed;
+        a keyframe with no vector is skipped by design (it could never be a k-NN
+        result, and its presence would only distort corpus_size)."""
+        assert self._conn is not None
+        n_vectors = dataset.embedding_count()
+        if not self._prepare_table("keyframes", n_vectors, force=force):
+            return
+
+        meta = {}
+        for batch in dataset.iter_table(
+                "keyframes", columns=["keyframe_id", "shot_id", "video_id", "frame_number"]):
+            for row in batch:
+                meta[row["keyframe_id"]] = (row["shot_id"], row["video_id"], row["frame_number"])
+        print(f"[load] keyframes: {len(meta):,} metadata rows, {n_vectors:,} vectors", flush=True)
+
+        missing = 0
+        written = 0
+
+        def rows():
+            nonlocal missing, written
+            for ids, vecs in dataset.iter_embeddings():
+                for kid, vec in zip(ids, vecs):
+                    m = meta.get(kid)
+                    if m is None:
+                        missing += 1
+                        continue
+                    shot_id, video_id, frame_number = m
+                    yield _copy_line((kid, shot_id, video_id, frame_number,
+                                      _vector_literal(vec)))
+                    written += 1
+                print(f"[load]   keyframes {written:,}/{n_vectors:,}", flush=True)
+
+        self._copy_from(("keyframes", _KEYFRAME_COLUMNS), rows())
+        if missing:
+            print(f"[load] WARNING: {missing:,} vectors had no metadata row "
+                  "(shard metadata and embeddings disagree)", flush=True)
+        orphan = len(meta) - written
+        if orphan > 0:
+            print(f"[load] note: {orphan:,} keyframes have no vector — not loaded",
+                  flush=True)
+
+    def _copy_table(self, dataset: Dataset, table: str, force: bool = False) -> None:
+        cols = _COPY_COLUMNS[table]
+        expected = dataset.table_rows(table)
+        if not self._prepare_table(table, expected, force=force):
+            return
+
+        n = 0
+
+        def rows():
+            nonlocal n
+            for batch in dataset.iter_table(table, columns=list(cols)):
+                for row in batch:
+                    yield _copy_line(tuple(row[c] for c in cols))
+                n += len(batch)
+                print(f"[load]   {table} {n:,}/{expected:,}", flush=True)
+
+        self._copy_from((table, cols), rows())
+
+    def _prepare_table(self, table: str, expected: int, force: bool) -> bool:
+        """True if `table` should be loaded now.
+
+        Three cases, and NONE of them destroys data implicitly:
+          * count already == expected  -> skip (this is what makes load_data
+            idempotent, and what a re-run after a preemption relies on)
+          * empty                      -> load
+          * non-empty but wrong count  -> raise
+        The last case is deliberately not an automatic TRUNCATE. A row count can
+        be "wrong" because the shard changed, because a previous load died
+        halfway, or because this DB holds a *different* shard — and silently
+        wiping millions of loaded rows (plus an hours-long HNSW rebuild) on that
+        guess is not a call this code should make. `force=True` opts in."""
+        assert self._conn is not None
+        with self._conn.cursor() as cur:
+            cur.execute(f"SELECT count(*) FROM {table};")
+            have = _scalar(cur)
+            if not force and have == expected and expected > 0:
+                print(f"[load] skip {table}: already {have:,} rows", flush=True)
+                return False
+            if have and not force:
+                raise RuntimeError(
+                    f"{table} holds {have:,} rows but the shard has {expected:,}. "
+                    "Refusing to overwrite: re-run with --force to truncate and "
+                    "reload this system, or point --dataset at the matching shard.")
+            if have:
+                print(f"[load] truncating {table} ({have:,} rows) — force", flush=True)
+                cur.execute(f"TRUNCATE {table};")
+        return True
+
+    def _copy_from(self, target: tuple[str, tuple[str, ...]], lines) -> None:
+        table, cols = target
+        assert self._conn is not None
+        sql = f"COPY {table} ({', '.join(cols)}) FROM STDIN"
+        with self._conn.cursor() as cur:
+            # psycopg2 accepts any object with read()/readline() returning str
+            # (the documented StringIO usage); the stubs only admit bytes/TextIO.
+            cur.copy_expert(sql, _LineReader(lines))  # type: ignore[arg-type]
+
+    def _connect(self) -> None:
         import psycopg2  # optional dep (`pgvector` extra)
 
         self._conn = psycopg2.connect(self.dsn) if self.dsn else psycopg2.connect()
         self._conn.autocommit = True
+
+    def setup(self) -> None:
+        self._connect()
+        assert self._conn is not None
         with self._conn.cursor() as cur:
             # HNSW search-time knobs; set per session.
             cur.execute("SET hnsw.ef_search = %s;", (self.ef_search,))
@@ -94,13 +338,16 @@ class PgvectorAdapter(VectorDBAdapter):
             cur.execute("SELECT to_regclass('public.keyframes_embedding_hnsw_idx');")
             row = cur.fetchone()
             if row is None or row[0] is None:
-                raise RuntimeError("keyframes HNSW index missing — check the V3C load")
+                raise RuntimeError(
+                    "keyframes HNSW index missing — this system has not been loaded. "
+                    "Run `python scripts/load_dataset.py --dataset <path>` (setup() "
+                    "deliberately will not ingest: a run that silently loads is a run "
+                    "whose timings mean nothing).")
             # Pin the statistics state (fairness invariant): refresh planner stats on
             # every filter relation so plan choice + recall are reproducible. Skip any
             # table absent from this deployment (e.g. before a schema is fully loaded).
             for table in _ANALYZE_TABLES:
-                cur.execute("SELECT to_regclass(%s);", (f"public.{table}",))
-                if _scalar(cur) is not None:
+                if _table_exists(cur, table):
                     cur.execute(f"ANALYZE {table};")
 
     def teardown(self) -> None:
@@ -296,6 +543,96 @@ class PgvectorAdapter(VectorDBAdapter):
 
 def _as_list(value) -> list:
     return [value] if isinstance(value, str) else list(value)
+
+
+# ── COPY ... FROM STDIN (TEXT format) encoding, used by load_data ──────────────
+# TEXT, not CSV, deliberately: V3C titles and OCR spans contain embedded newlines
+# and quotes, which CSV quoting gets wrong often enough to matter (this bit the
+# original V3C1 load — see the pgvector HPC guide). TEXT uses tab separators and
+# backslash escapes, with no quoting ambiguity at all.
+
+def _pg_escape(s: str) -> str:
+    """Escape one TEXT-format field. Backslash MUST be replaced first, or the
+    escapes introduced below would themselves get escaped."""
+    return (s.replace("\\", "\\\\")
+             .replace("\n", "\\n")
+             .replace("\r", "\\r")
+             .replace("\t", "\\t"))
+
+
+def _pg_array_literal(values) -> str:
+    """Python list -> a pg array literal `{"a","b"}`. Every element is quoted, so
+    commas/braces/spaces inside a tag are safe; NULL elements become unquoted NULL
+    (the only way to express them)."""
+    parts = []
+    for v in values:
+        if v is None:
+            parts.append("NULL")
+        else:
+            inner = str(v).replace("\\", "\\\\").replace('"', '\\"')
+            parts.append(f'"{inner}"')
+    return "{" + ",".join(parts) + "}"
+
+
+def _vector_literal(vec) -> str:
+    """float32[768] -> pgvector's text input form `[a,b,...]`. 8 decimals matches
+    what search() sends, so stored and queried vectors round-trip identically."""
+    return "[" + ",".join(f"{float(x):.8f}" for x in vec) + "]"
+
+
+def _copy_field(v) -> str:
+    if v is None:
+        return "\\N"                       # the TEXT-format NULL marker
+    if isinstance(v, (list, tuple)):
+        return _pg_escape(_pg_array_literal(v))
+    if isinstance(v, bool):
+        return "t" if v else "f"
+    if isinstance(v, str):
+        return _pg_escape(v)
+    return _pg_escape(str(v))
+
+
+def _copy_line(row) -> str:
+    return "\t".join(_copy_field(v) for v in row) + "\n"
+
+
+class _LineReader:
+    """File-like adapter so psycopg2's copy_expert can pull from a generator of
+    lines. copy_expert calls .read(size); we buffer just enough to answer each
+    call, which keeps a multi-GB COPY at a few hundred KB of RAM."""
+
+    def __init__(self, lines):
+        self._lines = iter(lines)
+        self._buf = ""
+
+    def read(self, size: int = -1) -> str:
+        if size is None or size < 0:
+            return self._buf + "".join(self._lines)
+        while len(self._buf) < size:
+            try:
+                self._buf += next(self._lines)
+            except StopIteration:
+                break
+        chunk, self._buf = self._buf[:size], self._buf[size:]
+        return chunk
+
+    def readline(self, size: int = -1) -> str:
+        if not self._buf:
+            try:
+                self._buf = next(self._lines)
+            except StopIteration:
+                return ""
+        idx = self._buf.find("\n")
+        cut = len(self._buf) if idx < 0 else idx + 1
+        if 0 <= size < cut:
+            cut = size
+        chunk, self._buf = self._buf[:cut], self._buf[cut:]
+        return chunk
+
+
+def _table_exists(cur, table: str) -> bool:
+    cur.execute("SELECT to_regclass(%s);", (f"public.{table}",))
+    return _scalar(cur) is not None
 
 
 def _scalar(cur):

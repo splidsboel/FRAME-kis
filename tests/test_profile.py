@@ -20,6 +20,9 @@ class FakeProfilingAdapter(VectorDBAdapter):
         self._members = members
         self.entered = False
 
+    def load_data(self, dataset) -> None:   # ingest is out of scope for profiling
+        raise NotImplementedError
+
     def setup(self) -> None:
         self.entered = True
 

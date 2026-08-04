@@ -92,7 +92,11 @@ class FakeAdapter(VectorDBAdapter):
         self._unfiltered = unfiltered_ids or ["kf_x", "kf_target", "kf_y"]
         self.setup_calls = 0
         self.teardown_calls = 0
+        self.load_calls: list = []
         self.search_calls: list[tuple[int, int]] = []  # (n_filters, k)
+
+    def load_data(self, dataset) -> None:
+        self.load_calls.append(dataset)
 
     def setup(self) -> None:
         self.setup_calls += 1

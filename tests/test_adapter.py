@@ -21,17 +21,47 @@ def test_context_manager_calls_setup_and_teardown(fake_adapter):
     assert fake_adapter.teardown_calls == 1
 
 
+class Bare(VectorDBAdapter):
+    """The minimum a concrete adapter must implement."""
+
+    name = "bare"
+
+    def load_data(self, dataset) -> None: ...
+
+    def setup(self) -> None: ...
+
+    def search(self, query_vector, filters, k):
+        return []
+
+
 def test_default_teardown_is_a_noop():
-    class Bare(VectorDBAdapter):
-        name = "bare"
+    # teardown not overridden — should not raise
+    Bare().teardown()
+
+
+def test_load_data_is_part_of_the_contract():
+    """Ingest is per-system and mandatory: an adapter that implements only
+    setup()+search() must not be instantiable. Guards the Tier-2 -> Tier-3 split
+    (see the adapter module docstring)."""
+    class NoLoad(VectorDBAdapter):
+        name = "noload"
 
         def setup(self) -> None: ...
 
         def search(self, query_vector, filters, k):
             return []
 
-    # teardown not overridden — should not raise
-    Bare().teardown()
+    with pytest.raises(TypeError):
+        NoLoad()  # type: ignore[abstract]
+
+
+def test_context_manager_does_not_ingest(fake_adapter):
+    """`with adapter:` is the per-RUN path — it must never trigger load_data(),
+    or a benchmark run would silently pay a multi-million-row ingest."""
+    with fake_adapter:
+        pass
+    assert fake_adapter.load_calls == []
+    assert fake_adapter.setup_calls == 1
 
 
 def test_search_receives_filters_and_k(fake_adapter):
