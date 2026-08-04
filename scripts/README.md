@@ -49,4 +49,32 @@ sbatch scripts/prep_consolidate.sh              # CPU: _staging/* -> canonical s
 
 The four model passes are independent (run in parallel) and resumable per video
 (a preempted array task skips videos whose staging file exists). `--num-shards`
-is taken from the array size — keep `#SBATCH --array` in sync.
+is **pinned to `NUM_SHARDS=8`** in each `.sh`, deliberately *not* derived from
+`SLURM_ARRAY_TASK_COUNT`: resubmitting a subset after a failure (e.g.
+`--array=1,6,7`) would set that to 3 and silently re-map every video to a
+different shard, corrupting the staging. Change `NUM_SHARDS` and
+`#SBATCH --array` together, or override `NUM_SHARDS=<n>` in the environment.
+
+---
+
+## Figures (`plot_*.py`)
+
+Standalone — json + matplotlib only, no `frame` import — so they run locally
+after pulling the artifact, or in-job with the `viz` extra. Each writes PDF +
+PNG per figure into `--out` (default `results/figures/`), light-mode/print, from
+one shared palette.
+
+| script | reads | figures |
+|---|---|---|
+| `plot_metrics.py` | `data/metrics.<system>.jsonl` (Analyzer) | `rank_distribution` (boxplot of target rank per condition, every query overlaid), `mrr_caps` (MRR at {1000,100,50,10}), `recall_at_k` |
+| `plot_query_selectivity.py` | `data/profile.<system>.jsonl` (Profiler) | `query_selectivity`, `conjunction_parts` |
+| `plot_cutover.py` | `data/sweep.<system>.*.jsonl` (Sweeper) | exact↔approximate cutover |
+| `plot_data_stats.py` | `data/data_stats.json` | corpus/metadata characterization |
+
+```bash
+uv run python scripts/plot_metrics.py --in data/metrics.pgvector.jsonl
+```
+
+`plot_metrics.py` defines the conditions it compares in one function
+(`conditions()`); when the Runner grows the full 2×2, extend that and all three
+figures follow.

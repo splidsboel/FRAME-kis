@@ -71,6 +71,8 @@ def run_and_score(system, encoder, items, k, warmup, repeat, adapter_kwargs, lab
     print()
     print(f"raw     -> {os.path.relpath(raw_path, HERE)}")
     print(f"metrics -> {os.path.relpath(metrics_path, HERE)}")
+    print(f"figures -> python scripts/plot_metrics.py --in "
+          f"{os.path.relpath(metrics_path, HERE)}")
     return metrics
 
 

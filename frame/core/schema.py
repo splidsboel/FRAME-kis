@@ -191,11 +191,18 @@ class QueryMetrics:
 
     @property
     def rr_filtered(self) -> float:
-        return 1.0 / self.target_rank_filtered if self.target_rank_filtered else 0.0
+        """Uncapped reciprocal rank. For a capped MRR use Metrics.mrr_filtered(cap)."""
+        return _reciprocal_rank(self.target_rank_filtered, None)
 
     @property
     def rr_unfiltered(self) -> float:
-        return 1.0 / self.target_rank_unfiltered if self.target_rank_unfiltered else 0.0
+        return _reciprocal_rank(self.target_rank_unfiltered, None)
+
+    def rr_filtered_at(self, cap: int | None) -> float:
+        return _reciprocal_rank(self.target_rank_filtered, cap)
+
+    def rr_unfiltered_at(self, cap: int | None) -> float:
+        return _reciprocal_rank(self.target_rank_unfiltered, cap)
 
     def to_dict(self) -> dict:
         return {
@@ -217,9 +224,17 @@ class Metrics:
     system: str
     ks: Sequence[int]
     per_query: list[QueryMetrics] = field(default_factory=list)
+    # Retrieval depth of the run that produced these (RawResults.k). Carried so a
+    # capped MRR can say whether its cap is meaningful: no rank beyond k exists,
+    # so MRR@cap for cap >= k is just the uncapped MRR wearing a hat. 0 = unknown.
+    retrieval_k: int = 0
 
     def _scorable(self) -> list[QueryMetrics]:
         return [m for m in self.per_query if m.scorable]
+
+    def cap_is_meaningful(self, cap: int) -> bool:
+        """False when the cap is at or above the run's retrieval depth."""
+        return self.retrieval_k > 0 and cap < self.retrieval_k
 
     def mean_recall_filtered(self, k: int) -> float:
         rows = self._scorable()
@@ -229,11 +244,15 @@ class Metrics:
         rows = self._scorable()
         return _safe_mean([m.recall_unfiltered.get(k, 0.0) for m in rows])
 
-    def mrr_filtered(self) -> float:
-        return _safe_mean([m.rr_filtered for m in self._scorable()])
+    # MRR at a capped rank (Omar, 28-07): a target found beyond `cap` counts as a
+    # MISS, not as a small reciprocal. cap=None is the uncapped MRR. The cap models
+    # how deep a VBS user would actually look — a target at rank 800 is a miss in
+    # practice, but contributes 0.00125 to an uncapped MRR and so hides there.
+    def mrr_filtered(self, cap: int | None = None) -> float:
+        return _safe_mean([m.rr_filtered_at(cap) for m in self._scorable()])
 
-    def mrr_unfiltered(self) -> float:
-        return _safe_mean([m.rr_unfiltered for m in self._scorable()])
+    def mrr_unfiltered(self, cap: int | None = None) -> float:
+        return _safe_mean([m.rr_unfiltered_at(cap) for m in self._scorable()])
 
     # Latency is a system property independent of scorability, so it is summarised
     # over ALL items (a filtered search still has a real cost when the target fails
@@ -244,9 +263,21 @@ class Metrics:
     def median_latency_unfiltered(self) -> float:
         return _median([m.latency_unfiltered_ms for m in self.per_query])
 
+    # Tail latency ACROSS queries, not within one. Each per-query number is already
+    # the median of `repeat` warm trials (Runner), so this asks "which queries are
+    # slow", not "how noisy is one query" — with ~30 items a within-query p95 off 5
+    # trials would be noise, while the across-query tail is where a planner cutover
+    # or a broad filter shows up.
+    def latency_percentile_filtered(self, p: float = 95.0) -> float:
+        return _percentile([m.latency_filtered_ms for m in self.per_query], p)
+
+    def latency_percentile_unfiltered(self, p: float = 95.0) -> float:
+        return _percentile([m.latency_unfiltered_ms for m in self.per_query], p)
+
     def write_jsonl(self, path: str) -> None:
         with open(path, "w") as f:
-            f.write(json.dumps({"system": self.system, "ks": list(self.ks)}) + "\n")
+            f.write(json.dumps({"system": self.system, "ks": list(self.ks),
+                                "retrieval_k": self.retrieval_k}) + "\n")
             for m in self.per_query:
                 f.write(json.dumps(m.to_dict()) + "\n")
 
@@ -263,3 +294,29 @@ def _median(xs: Iterable[float]) -> float:
         return 0.0
     mid = n // 2
     return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2.0
+
+
+def _percentile(xs: Iterable[float], p: float) -> float:
+    """Linear-interpolated percentile (numpy's default), so p=50 == _median and the
+    figures agree with the printed summary. Kept dependency-free: schema.py is the
+    seam both halves of the suite import, and it stays stdlib-only."""
+    xs = sorted(xs)
+    n = len(xs)
+    if n == 0:
+        return 0.0
+    if n == 1:
+        return xs[0]
+    pos = (n - 1) * max(0.0, min(100.0, p)) / 100.0
+    lo = int(pos)
+    hi = min(lo + 1, n - 1)
+    return xs[lo] + (xs[hi] - xs[lo]) * (pos - lo)
+
+
+def _reciprocal_rank(rank: int | None, cap: int | None) -> float:
+    """1/rank, or 0.0 when the target was never found (rank None) or was found
+    deeper than `cap` — a capped MRR treats too-deep as a miss, not as a tiny hit."""
+    if rank is None or rank < 1:
+        return 0.0
+    if cap is not None and rank > cap:
+        return 0.0
+    return 1.0 / rank

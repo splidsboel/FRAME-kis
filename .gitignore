@@ -13,6 +13,14 @@ candidates*.json
 *.out
 slurm-*.out
 
+# Figures — regenerated from the data artifacts by scripts/plot_*.py, and copied
+# into the thesis LaTeX project when a version is actually used. Kept out of git
+# so re-runs don't churn binaries (results/figures/.gitkeep is tracked).
+results/*
+!results/figures/
+results/figures/*
+!results/figures/.gitkeep
+
 # Python
 __pycache__/
 *.py[cod]

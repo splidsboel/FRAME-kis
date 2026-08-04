@@ -112,3 +112,54 @@ def test_summary_contains_headline_numbers(enriched_item):
     assert "system: pgvector" in text
     assert "scorable: 1" in text
     assert "MRR" in text
+
+
+# ─── capped MRR + retrieval depth ───────────────────────────────────────────
+
+def test_analyze_carries_retrieval_depth(enriched_item):
+    # the run's k must reach Metrics, else a capped MRR cannot know whether its cap
+    # is inside the retrieved list or a no-op
+    item = QueryItem.from_dict(enriched_item)
+    raw = RawResults(system="fake", k=250,
+                     results=[_raw("q0001", ["kf_target"], ["kf_target"])])
+    assert Analyzer(ks=(5,)).analyze(raw, [item]).retrieval_k == 250
+
+
+def test_summary_reports_every_mrr_cap(enriched_item):
+    item = QueryItem.from_dict(enriched_item)
+    # target at rank 60 of a k=1000 run: inside caps 1000/100, a miss at 50/10
+    ids = [f"kf_{i}" for i in range(59)] + ["kf_target"]
+    raw = RawResults(system="pgvector", k=1000,
+                     results=[_raw("q0001", ids, ids)])
+    m = Analyzer(ks=(5,), mrr_caps=(1000, 100, 50, 10)).analyze(raw, [item])
+    text = Analyzer(ks=(5,), mrr_caps=(1000, 100, 50, 10)).summary(m)
+    for cap in (1000, 100, 50, 10):
+        assert f"{cap:>7} |" in text
+    assert m.mrr_filtered(100) == 1 / 60
+    assert m.mrr_filtered(50) == 0.0
+
+
+def test_summary_flags_caps_at_or_beyond_retrieval_depth(enriched_item):
+    item = QueryItem.from_dict(enriched_item)
+    raw = RawResults(system="pgvector", k=100,
+                     results=[_raw("q0001", ["kf_target"], ["kf_target"])])
+    m = Analyzer(ks=(5,)).analyze(raw, [item])
+    text = Analyzer(ks=(5,)).summary(m)
+    # k=100 => @1000 and @100 cannot bite and must say so; @50 and @10 are real
+    lines = {int(l.split("|")[0].strip()): l
+             for l in text.splitlines() if l.strip()[:1].isdigit() and "|" in l}
+    assert "uncapped" in lines[1000]
+    assert "uncapped" in lines[100]
+    assert "uncapped" not in lines[50]
+    assert "uncapped" not in lines[10]
+
+
+# ─── latency reporting ──────────────────────────────────────────────────────
+
+def test_summary_reports_median_and_p95(enriched_item):
+    item = QueryItem.from_dict(enriched_item)
+    raw = RawResults(system="pgvector", k=5,
+                     results=[_raw("q0001", ["kf_target"], ["kf_target"])])
+    text = Analyzer(ks=(5,)).summary(Analyzer(ks=(5,)).analyze(raw, [item]))
+    assert "median" in text
+    assert "p95" in text

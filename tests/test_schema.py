@@ -210,10 +210,77 @@ def test_metrics_write_jsonl(tmp_path):
     m.write_jsonl(str(p))
     lines = p.read_text().splitlines()
     header = json.loads(lines[0])
-    assert header == {"system": "s", "ks": [5, 25]}
+    assert header == {"system": "s", "ks": [5, 25], "retrieval_k": 0}
     row = json.loads(lines[1])
     assert row["query_id"] == "q1"
     assert row["rr_filtered"] == 0.5
+
+
+# ─── capped MRR (Omar, 28-07-2026) ──────────────────────────────────────────
+
+def _ranked(qid, rank_f, rank_nf=None):
+    return QueryMetrics(qid, True, {}, {}, rank_f, rank_nf, 1.0, 2.0)
+
+
+def test_capped_mrr_counts_too_deep_as_a_miss():
+    m = Metrics(system="s", ks=(5,),
+                per_query=[_ranked("q1", 1), _ranked("q2", 100)])
+    assert m.mrr_filtered() == (1.0 + 0.01) / 2          # uncapped
+    assert m.mrr_filtered(1000) == (1.0 + 0.01) / 2
+    assert m.mrr_filtered(100) == (1.0 + 0.01) / 2       # rank 100 is exactly at cap
+    assert m.mrr_filtered(50) == 0.5                     # rank 100 -> miss, not 0.01
+    assert m.mrr_filtered(10) == 0.5
+
+
+def test_capped_mrr_never_found_stays_a_miss():
+    m = Metrics(system="s", ks=(5,), per_query=[_ranked("q1", None)])
+    assert m.mrr_filtered(10) == 0.0
+    assert m.mrr_filtered() == 0.0
+
+
+def test_capped_mrr_applies_to_both_conditions():
+    m = Metrics(system="s", ks=(5,), per_query=[_ranked("q1", 200, 2)])
+    assert m.mrr_filtered(50) == 0.0
+    assert m.mrr_unfiltered(50) == 0.5
+
+
+def test_per_query_rr_at_cap():
+    q = _ranked("q1", 40)
+    assert q.rr_filtered_at(50) == 0.025
+    assert q.rr_filtered_at(10) == 0.0
+    assert q.rr_filtered == 0.025            # property stays uncapped
+
+
+def test_cap_is_meaningful_against_retrieval_depth():
+    # nothing was retrieved past k, so a cap at/above k is the uncapped MRR
+    m = Metrics(system="s", ks=(5,), per_query=[], retrieval_k=1000)
+    assert m.cap_is_meaningful(100) is True
+    assert m.cap_is_meaningful(1000) is False
+    assert m.cap_is_meaningful(2000) is False
+    # unknown depth (legacy metrics file) => cannot claim a cap is meaningful
+    assert Metrics(system="s", ks=(5,), per_query=[]).cap_is_meaningful(10) is False
+
+
+# ─── latency percentiles ────────────────────────────────────────────────────
+
+def test_latency_percentile_over_all_items():
+    m = Metrics(
+        system="s", ks=(5,),
+        per_query=[_qm(f"q{i}", True, {}, {}, 1, float(i), float(i) * 10)
+                   for i in range(1, 101)],   # 1..100 ms filtered, 10..1000 nofilter
+    )
+    assert m.latency_percentile_filtered(50) == m.median_latency_filtered()
+    assert m.latency_percentile_filtered(95) == 95.05
+    assert m.latency_percentile_unfiltered(95) == 950.5
+    assert m.latency_percentile_filtered(100) == 100.0
+    assert m.latency_percentile_filtered(0) == 1.0
+
+
+def test_latency_percentile_degenerate_inputs():
+    assert Metrics(system="s", ks=(5,), per_query=[]).latency_percentile_filtered(95) == 0.0
+    one = Metrics(system="s", ks=(5,),
+                  per_query=[_qm("q1", True, {}, {}, 1, 7.0, 8.0)])
+    assert one.latency_percentile_filtered(95) == 7.0
 
 
 # ─── helpers ────────────────────────────────────────────────────────────────

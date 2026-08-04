@@ -4,9 +4,17 @@ oracle ground truth (from each item's `computed` block) and produces metrics.
 
 Two families of metric, mirroring the thesis' two lenses:
   * geometric correctness — Recall@k of the system's ranking vs the oracle's exact
-    filtered / unfiltered k-NN.
+    filtered / unfiltered k-NN, sliced at k ∈ DEFAULT_KS.
   * task success (KIS) — rank of the known target keyframe(s) in the system ranking,
-    summarised as MRR.
+    summarised as MRR at the rank caps in DEFAULT_MRR_CAPS (a target deeper than the
+    cap is a miss, not a small reciprocal).
+
+Latency is reported as the median AND the p95 across queries — the median is the
+typical cost, the p95 is where a planner cutover or a broad filter shows up, and
+reporting only the median hides exactly the queries the thesis is about.
+
+The Analyzer produces numbers, never figures. Plotting lives in
+scripts/plot_metrics.py, which reads the metrics jsonl this writes.
 
 Only items with computed, self-consistent GT are scored (see GroundTruth.is_scorable):
 filtered GT present AND the target survives its own filter. Items whose filter
@@ -29,10 +37,17 @@ from .schema import (
 
 DEFAULT_KS = (5, 25, 50, 100, 1000)
 
+# Rank caps for MRR (Omar, 28-07-2026): a target found deeper than the cap counts
+# as a MISS. Deliberately a different set from DEFAULT_KS — those are fine-grained
+# recall slices, these are "how deep would a VBS user realistically look".
+DEFAULT_MRR_CAPS = (1000, 100, 50, 10)
+
 
 class Analyzer:
-    def __init__(self, ks: Sequence[int] = DEFAULT_KS):
+    def __init__(self, ks: Sequence[int] = DEFAULT_KS,
+                 mrr_caps: Sequence[int] = DEFAULT_MRR_CAPS):
         self.ks = tuple(ks)
+        self.mrr_caps = tuple(mrr_caps)
 
     def analyze(self, raw: RawResults, items: Sequence[QueryItem]) -> Metrics:
         gt_by_id = {it.query_id: it.ground_truth for it in items}
@@ -40,7 +55,8 @@ class Analyzer:
             self._score_one(r, gt_by_id.get(r.query_id))
             for r in raw.results
         ]
-        return Metrics(system=raw.system, ks=self.ks, per_query=per_query)
+        return Metrics(system=raw.system, ks=self.ks, per_query=per_query,
+                       retrieval_k=raw.k)
 
     def _score_one(self, r: RawResult, gt: GroundTruth | None) -> QueryMetrics:
         scorable = gt is not None and gt.is_scorable
@@ -83,13 +99,27 @@ class Analyzer:
             )
         lines += [
             "",
-            f"MRR  filtered: {m.mrr_filtered():.3f}   "
-            f"no-filter: {m.mrr_unfiltered():.3f}   "
-            f"(Δ = {m.mrr_filtered() - m.mrr_unfiltered():+.3f})",
+            f"{'MRR@cap':>7} | {'filtered':>8} | {'no-filter':>9} | {'Δ':>7}",
+            "-" * 40,
+        ]
+        for cap in self.mrr_caps:
+            f, nf = m.mrr_filtered(cap), m.mrr_unfiltered(cap)
+            # A cap at or past the retrieval depth cannot bite: no rank beyond k
+            # exists, so that row is the uncapped MRR. Say so rather than let it
+            # read as a fourth data point.
+            note = "" if m.cap_is_meaningful(cap) else f"  (= uncapped, run k={m.retrieval_k})"
+            lines.append(f"{cap:>7} | {f:>8.3f} | {nf:>9.3f} | {f - nf:>+7.3f}{note}")
+
+        lines += [
             "",
-            f"median latency  filtered: {m.median_latency_filtered():8.1f} ms   "
-            f"no-filter: {m.median_latency_unfiltered():8.1f} ms   "
-            f"(all {n} items, warm)",
+            f"{'latency':>7} | {'filtered':>10} | {'no-filter':>11}",
+            "-" * 40,
+            f"{'median':>7} | {m.median_latency_filtered():>7.1f} ms | "
+            f"{m.median_latency_unfiltered():>8.1f} ms",
+            f"{'p95':>7} | {m.latency_percentile_filtered(95):>7.1f} ms | "
+            f"{m.latency_percentile_unfiltered(95):>8.1f} ms",
+            f"(across all {n} items, warm; each item is itself the median of the "
+            f"Runner's repeat trials)",
         ]
         return "\n".join(lines)
 
