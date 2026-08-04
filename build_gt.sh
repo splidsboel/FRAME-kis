@@ -14,8 +14,18 @@
 # Args after the script name pass straight to oracle/build_gt.py, e.g.:
 #     sbatch build_gt.sh                                          # diagnostics pass
 #     sbatch build_gt.sh --scene-threshold 0.10 --object-threshold 0.30
+#
+# Submit from `ssh hpc3` (never hpc.itu.dk). Stays on `acltr` on purpose: the
+# `scavenge` desktop* nodes have a driver too old for torch cu121, so
+# torch.cuda.is_available() silently comes back False there.
 
 set -euo pipefail
+
+# Admin-mandated in every job script (keeps temp off the shared system /tmp).
+# The postgres socket below deliberately stays on node-local /tmp — $HOME/tmp is
+# NFS, and a unix socket there would be slow and fragile.
+export TMPDIR="$HOME/tmp"
+mkdir -p "$TMPDIR"
 
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"   # run `sbatch` from the FRAME-kis root
 SIF="$HOME/containers/pgvector-pg16.sif"

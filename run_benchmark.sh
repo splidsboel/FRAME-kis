@@ -12,12 +12,20 @@
 # on CPU, so this uses cores_any, not a GPU node. Reads the GT-enriched
 # data/benchmark.jsonl produced by build_gt.sh, so run that FIRST.
 #
-# Submit from the repo root:
+# Submit from the repo root, from `ssh hpc3` (never hpc.itu.dk):
 #     sbatch run_benchmark.sh                 # defaults: --system pgvector
 #     sbatch run_benchmark.sh --system pgvector --k 1000
 # Extra args pass straight through to run_benchmark.py.
+#
+# If `embeddings` is ever lost, rebuild a replacement env with `sbatch setup_env.sh`.
 
 set -euo pipefail
+
+# Admin-mandated in every job script (keeps temp off the shared system /tmp).
+# The postgres socket below deliberately stays on node-local /tmp — $HOME/tmp is
+# NFS, and a unix socket there would be slow and fragile.
+export TMPDIR="$HOME/tmp"
+mkdir -p "$TMPDIR"
 
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"   # run `sbatch` from the FRAME-kis root
 SIF="$HOME/containers/pgvector-pg16.sif"
