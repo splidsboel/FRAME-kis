@@ -554,6 +554,19 @@ def main():
         #   *_vec_nofilter    = vec query, no filter    (decomposition effect vs raw)
         #   *_filtered        = vec query, + filter     (filter effect vs vec_nofilter)
         #   *_raw_filtered    = raw query, + filter      (filter effect on the full text)
+        # Clear the whole t-dependent block first. build.py carries a previous run's
+        # `computed` forward for unchanged queries, so without this a run that does
+        # NOT compute filtered GT (no --scene-threshold/--object-threshold) would
+        # leave the OLD filtered GT in place next to freshly computed no-filter GT —
+        # one item holding ground truth from two different parameter sets, silently.
+        # Either this block is fully recomputed under this run's thresholds, or it
+        # is absent and the item is visibly unenriched.
+        for stale in ("target_passes_filter", "geometric_gt_filtered",
+                      "target_rank_filtered", "geometric_gt_raw_filtered",
+                      "target_rank_raw_filtered", "scene_threshold",
+                      "object_threshold"):
+            c.pop(stale, None)
+
         ready = bool(filters) and all(filter_ready(f, thresholds) for f in filters)
         if ready:
             # record the threshold used for each side-table filter type this item
@@ -566,6 +579,22 @@ def main():
             c["target_rank_filtered"] = target_rank(cur, emb_vec, tkfs, filters, thresholds)
             c["geometric_gt_raw_filtered"] = brute_knn(cur, emb_raw, args.k, filters, thresholds)
             c["target_rank_raw_filtered"] = target_rank(cur, emb_raw, tkfs, filters, thresholds)
+
+    # Loud, not silent: without --scene-threshold / --object-threshold the filtered
+    # GT is not computed at all, which leaves the two FILTER cells of the 2x2
+    # unscorable. That is a legitimate diagnostics-only run, but it must never be
+    # mistaken for a complete one.
+    missing = [it["query_id"] for it in items
+               if it["decomposition"].get("filters")
+               and (it.get("computed") or {}).get("geometric_gt_filtered") is None]
+    if missing:
+        print(f"\n[WARN] {len(missing)} item(s) have filters but NO filtered ground "
+              f"truth — the raw+filter and semantic+filter cells cannot be scored.")
+        print(f"[WARN] Pass the pinned thresholds to compute it:")
+        print(f"[WARN]   sbatch build_gt.sh --k {args.k} "
+              f"--scene-threshold 0.10 --object-threshold 0.30")
+        print(f"[WARN] affected: {', '.join(missing[:8])}"
+              f"{'…' if len(missing) > 8 else ''}\n")
 
     # Refresh the version header: the GT just changed, and the parameters it was
     # computed under are part of what makes two runs comparable. Recording them here
