@@ -30,13 +30,35 @@ apptainer exec --bind /dev/shm --bind /tmp --bind "$PGSOCKET:$PGSOCKET" "$SIF" \
     postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off &
 PG_PID=$!
 
-for i in $(seq 1 60); do
+# Shut postgres down cleanly however this job ends -- scancel, an error under
+# `set -e`, or success. A killed postgres leaves $PGDATA dirty, and the *next*
+# job silently pays for it in crash recovery.
+stop_pg() {
+    apptainer exec --bind /dev/shm --bind /tmp "$SIF" \
+        pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
+    wait "$PG_PID" 2>/dev/null || true
+}
+trap stop_pg EXIT
+trap 'exit 143' INT TERM   # let the EXIT trap do the shutdown, then die
+
+# Wait generously: if a previous job was killed (scancel, or an error under
+# `set -e`), postgres starts by running crash recovery, which fsyncs the whole
+# 20G data directory -- minutes, not the ~4s of a clean start. And fail LOUDLY on
+# timeout: falling through a silent timeout only defers the error to the next
+# psql/python call, where it reads as an unrelated connection failure.
+pg_ready=0
+for i in $(seq 1 300); do
     if apptainer exec --bind /dev/shm --bind /tmp "$SIF" \
             pg_isready -h "$PGSOCKET" -U postgres -q 2>/dev/null; then
-        echo "[$(date)] postgres ready (${i}s)"; break
+        echo "[$(date)] postgres ready (${i} attempts)"; pg_ready=1; break
     fi
     sleep 1
 done
+if [ "$pg_ready" -ne 1 ]; then
+    echo "[$(date)] FATAL: postgres never became ready -- see its log above." >&2
+    echo "  'database system was interrupted' means crash recovery was still running." >&2
+    exit 1
+fi
 
 module load Anaconda3
 set +u
@@ -52,6 +74,5 @@ echo "[$(date)] Running profile_vs_k.py $* ..."
 python3 -u scripts/profile_vs_k.py "$@"
 
 echo "[$(date)] Stopping postgres..."
-apptainer exec --bind /dev/shm --bind /tmp "$SIF" pg_ctl stop -D "$PGDATA" -m fast
-wait "$PG_PID" 2>/dev/null || true
+stop_pg
 echo "[$(date)] Done."
