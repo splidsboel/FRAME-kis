@@ -41,6 +41,11 @@ def main() -> None:
     shard_root = os.path.expanduser(args.shard_root)
     out_dir = args.out or os.path.join("data", "canonical", args.dataset)
 
+    # Printed before touching torch/HF: tasks 6+7 of job 100871 burned 24h on cn12
+    # without emitting a single line, so this pins down whether a future hang is in
+    # imports, CUDA init, or the model load.
+    print(f"[embed] start shard={args.shard}/{args.num_shards} out={out_dir}", flush=True)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[embed] device={device} loading {SIGLIP_MODEL}", flush=True)
     processor = AutoProcessor.from_pretrained(SIGLIP_MODEL)
@@ -52,25 +57,42 @@ def main() -> None:
     for i, (video_id, vdir) in enumerate(vids):
         if is_done(out_dir, "embed", video_id, "npz"):
             continue
-        ids, images = [], []
-        for kid, _vid, _n, path in iter_keyframes(vdir):
-            try:
-                images.append(Image.open(path).convert("RGB"))
-                ids.append(kid)
-            except Exception as e:
-                print(f"[embed][warn] {path}: {e}", flush=True)
-        if not ids:
+        # Only the paths are held for the whole video — decoding every keyframe up
+        # front peaked at tens of GB on long videos and OOM-killed the job (32 GB
+        # cgroup). Images are now opened and released one batch at a time, so peak
+        # RSS is bounded by BATCH_SIZE, not by video length.
+        frames = [(kid, path) for kid, _vid, _n, path in iter_keyframes(vdir)]
+        if not frames:
             continue
 
-        vecs = np.empty((len(ids), EMBED_DIM), dtype=np.float32)
-        for b in range(0, len(images), BATCH_SIZE):
-            batch = images[b:b + BATCH_SIZE]
-            inputs = processor(images=batch, return_tensors="pt", padding=True)
+        ids, chunks = [], []
+        for b in range(0, len(frames), BATCH_SIZE):
+            batch_ids, images = [], []
+            for kid, path in frames[b:b + BATCH_SIZE]:
+                try:
+                    with Image.open(path) as im:
+                        images.append(im.convert("RGB"))
+                    batch_ids.append(kid)
+                except Exception as e:
+                    print(f"[embed][warn] {path}: {e}", flush=True)
+            if not batch_ids:
+                continue
+
+            inputs = processor(images=images, return_tensors="pt", padding=True)
             inputs = {k: v.to(device) for k, v in inputs.items()}
             with torch.no_grad():
                 out = model.vision_model(pixel_values=inputs["pixel_values"]).pooler_output
                 out = F.normalize(out, dim=-1)
-            vecs[b:b + len(batch)] = out.cpu().numpy().astype(np.float32)
+            chunks.append(out.cpu().numpy().astype(np.float32))
+            ids.extend(batch_ids)
+            for im in images:
+                im.close()
+            del images, inputs, out
+
+        if not ids:
+            continue
+        vecs = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
+        assert vecs.shape == (len(ids), EMBED_DIM), (vecs.shape, len(ids))
 
         final = staged_path(out_dir, "embed", video_id, "npz")
         tmp = final.with_name(final.name + ".tmp")

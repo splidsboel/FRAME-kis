@@ -18,6 +18,10 @@ set -euo pipefail
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 SHARD_ROOT="${1:-$HOME/datasets/V3C/V3C2}"
 DATASET="${2:-v3c2}"
+# Fixed at 8 to match `#SBATCH --array=0-7` — deliberately NOT SLURM_ARRAY_TASK_COUNT.
+# Resubmitting a subset after a failure (e.g. --array=1,6,7) sets that to 3, which
+# would silently re-map every video to a different shard and corrupt the staging.
+NUM_SHARDS="${NUM_SHARDS:-8}"
 export OCR_GPU=1
 
 module load Anaconda3
@@ -27,5 +31,5 @@ python3 -c "import easyocr" 2>/dev/null || pip install --quiet easyocr
 
 cd "$PROJECT_DIR"
 python3 -u scripts/prep_ocr.py --shard-root "$SHARD_ROOT" --dataset "$DATASET" \
-    --shard "${SLURM_ARRAY_TASK_ID:-0}" --num-shards "${SLURM_ARRAY_TASK_COUNT:-1}"
+    --shard "${SLURM_ARRAY_TASK_ID:-0}" --num-shards "$NUM_SHARDS"
 echo "[$(date)] Done (shard ${SLURM_ARRAY_TASK_ID:-0})."

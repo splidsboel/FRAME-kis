@@ -18,6 +18,10 @@ set -euo pipefail
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 SHARD_ROOT="${1:-$HOME/datasets/V3C/V3C2}"
 DATASET="${2:-v3c2}"
+# Fixed at 8 to match `#SBATCH --array=0-7` — deliberately NOT SLURM_ARRAY_TASK_COUNT.
+# Resubmitting a subset after a failure (e.g. --array=1,6,7) sets that to 3, which
+# would silently re-map every video to a different shard and corrupt the staging.
+NUM_SHARDS="${NUM_SHARDS:-8}"
 
 [ -f "$HOME/models/places365/resnet50_places365.pth.tar" ] || { echo "missing Places365 weights"; exit 1; }
 
@@ -27,5 +31,5 @@ python3 -c "import pyarrow" 2>/dev/null || pip install --quiet pyarrow
 
 cd "$PROJECT_DIR"
 python3 -u scripts/prep_scenes.py --shard-root "$SHARD_ROOT" --dataset "$DATASET" \
-    --shard "${SLURM_ARRAY_TASK_ID:-0}" --num-shards "${SLURM_ARRAY_TASK_COUNT:-1}"
+    --shard "${SLURM_ARRAY_TASK_ID:-0}" --num-shards "$NUM_SHARDS"
 echo "[$(date)] Done (shard ${SLURM_ARRAY_TASK_ID:-0})."

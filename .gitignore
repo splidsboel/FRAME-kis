@@ -2,6 +2,10 @@
 data/*.jsonl
 # probe dumps (author_probe.json, *.unions.json)
 data/*.json
+# canonical Tier-2 dataset — multi-GB parquet/h5, rebuilt by scripts/prep_*.py
+data/canonical/
+# corpus characterization dumps (scripts/data_stats.py)
+data/*.csv
 # scripts/author_probe.py --unions input (one-off, regenerable)
 candidates*.json
 
