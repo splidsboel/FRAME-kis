@@ -16,10 +16,17 @@ reporting only the median hides exactly the queries the thesis is about.
 The Analyzer produces numbers, never figures. Plotting lives in
 scripts/plot_metrics.py, which reads the metrics jsonl this writes.
 
-Only items with computed, self-consistent GT are scored (see GroundTruth.is_scorable):
-filtered GT present AND the target survives its own filter. Items whose filter
-excludes their target are reported as unscorable rather than silently counted as
-Recall@k = 0.
+Everything is scored PER CONDITION (the 2x2 matrix — schema.CONDITIONS), each cell
+against its own oracle answer: semantic+filter vs gt_filtered, raw+filter vs
+gt_raw_filtered, raw+nofilter vs gt_nofilter, semantic+nofilter vs gt_vec_nofilter.
+No cell is scored against a stand-in for its own ground truth.
+
+Scorability is also per condition (GroundTruth.scorable_for): a cell needs its own
+GT, and the two FILTER cells additionally need the target to survive the filter,
+else Recall@k is 0 by construction. Such items are reported unscorable for that
+cell rather than silently counted as Recall@k = 0. Aggregates then default to the
+items scorable in EVERY condition (Metrics.comparable) so the four cells are
+compared over one common subset — see the note on Metrics.comparable for why.
 """
 
 from __future__ import annotations
@@ -27,6 +34,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from .schema import (
+    CONDITIONS,
     GroundTruth,
     Metrics,
     QueryItem,
@@ -59,69 +67,116 @@ class Analyzer:
                        retrieval_k=raw.k)
 
     def _score_one(self, r: RawResult, gt: GroundTruth | None) -> QueryMetrics:
-        scorable = gt is not None and gt.is_scorable
-        recall_f = {k: 0.0 for k in self.ks}
-        recall_nf = {k: 0.0 for k in self.ks}
-        rank_f = rank_nf = None
+        targets = set(gt.target_keyframe_ids or []) if gt else set()
+        scorable: dict[str, bool] = {}
+        recall: dict[str, dict[int, float]] = {}
+        rank: dict[str, int | None] = {}
 
-        if scorable and gt is not None:
+        for cond in CONDITIONS:
+            if cond.name not in r.ids:
+                continue            # the run did not produce this cell for this item
+            ok = gt is not None and gt.scorable_for(cond)
+            scorable[cond.name] = ok
+            recall[cond.name] = {k: 0.0 for k in self.ks}
+            rank[cond.name] = None
+            if not ok or gt is None:
+                continue
+            ids = r.ids[cond.name]
             for k in self.ks:
-                recall_f[k] = _recall_at_k(r.filtered_ids, gt.gt_filtered, k)
-                recall_nf[k] = _recall_at_k(r.unfiltered_ids, gt.gt_nofilter, k)
-            targets = set(gt.target_keyframe_ids or [])
-            rank_f = _first_rank(r.filtered_ids, targets)
-            rank_nf = _first_rank(r.unfiltered_ids, targets)
+                recall[cond.name][k] = _recall_at_k(ids, gt.gt_for(cond), k)
+            rank[cond.name] = _first_rank(ids, targets)
 
         return QueryMetrics(
             query_id=r.query_id,
             scorable=scorable,
-            recall_filtered=recall_f,
-            recall_unfiltered=recall_nf,
-            target_rank_filtered=rank_f,
-            target_rank_unfiltered=rank_nf,
-            latency_filtered_ms=r.latency_filtered_ms,
-            latency_unfiltered_ms=r.latency_unfiltered_ms,
+            recall=recall,
+            target_rank=rank,
+            latency_ms=dict(r.latency_ms),
         )
 
+    def headline_cap(self, m: Metrics) -> int | None:
+        """The deepest cap that actually bites for this run — the one worth putting
+        on the 2x2 grid. None if every cap is at/beyond the retrieval depth."""
+        biting = [c for c in self.mrr_caps if m.cap_is_meaningful(c)]
+        return max(biting) if biting else None
+
     def summary(self, m: Metrics) -> str:
-        n = len(m.per_query)
-        n_ok = sum(1 for q in m.per_query if q.scorable)
+        conds = m.conditions()
+        n, n_cmp = len(m.per_query), len(m.comparable())
+        w = max((len(c) for c in conds), default=9)
+
         lines = [
-            f"system: {m.system}   items: {n}   scorable: {n_ok}",
+            f"system: {m.system}   items: {n}   comparable "
+            f"(scorable in all {len(conds)} conditions): {n_cmp}",
+            f"conditions: {', '.join(conds)}",
             "",
-            f"{'k':>6} | {'recall(filt)':>12} | {'recall(nofilt)':>14}",
-            "-" * 40,
+            f"Recall@k vs the oracle's exact k-NN — over the {n_cmp} comparable items",
+            f"{'condition':<{w}} | " + " | ".join(f"{k:>6}" for k in m.ks),
+            "-" * (w + 3 + 9 * len(m.ks)),
         ]
-        for k in m.ks:
-            lines.append(
-                f"{k:>6} | {m.mean_recall_filtered(k):>12.3f} | "
-                f"{m.mean_recall_unfiltered(k):>14.3f}"
-            )
-        lines += [
-            "",
-            f"{'MRR@cap':>7} | {'filtered':>8} | {'no-filter':>9} | {'Δ':>7}",
-            "-" * 40,
-        ]
-        for cap in self.mrr_caps:
-            f, nf = m.mrr_filtered(cap), m.mrr_unfiltered(cap)
-            # A cap at or past the retrieval depth cannot bite: no rank beyond k
-            # exists, so that row is the uncapped MRR. Say so rather than let it
-            # read as a fourth data point.
-            note = "" if m.cap_is_meaningful(cap) else f"  (= uncapped, run k={m.retrieval_k})"
-            lines.append(f"{cap:>7} | {f:>8.3f} | {nf:>9.3f} | {f - nf:>+7.3f}{note}")
+        for c in conds:
+            lines.append(f"{c:<{w}} | " +
+                         " | ".join(f"{m.mean_recall(c, k):>6.3f}" for k in m.ks))
 
         lines += [
             "",
-            f"{'latency':>7} | {'filtered':>10} | {'no-filter':>11}",
-            "-" * 40,
-            f"{'median':>7} | {m.median_latency_filtered():>7.1f} ms | "
-            f"{m.median_latency_unfiltered():>8.1f} ms",
-            f"{'p95':>7} | {m.latency_percentile_filtered(95):>7.1f} ms | "
-            f"{m.latency_percentile_unfiltered(95):>8.1f} ms",
-            f"(across all {n} items, warm; each item is itself the median of the "
-            f"Runner's repeat trials)",
+            f"MRR at rank caps — over the {n_cmp} comparable items",
+            f"{'condition':<{w}} | " + " | ".join(f"{'@' + str(c):>7}" for c in self.mrr_caps),
+            "-" * (w + 3 + 10 * len(self.mrr_caps)),
         ]
+        for c in conds:
+            lines.append(f"{c:<{w}} | " +
+                         " | ".join(f"{m.mrr(c, cap):>7.3f}" for cap in self.mrr_caps))
+        # A cap at or past the retrieval depth cannot bite: no rank beyond k exists,
+        # so those columns repeat the uncapped MRR. Say so rather than let them read
+        # as independent measurements.
+        inert = [c for c in self.mrr_caps if not m.cap_is_meaningful(c)]
+        if inert and m.retrieval_k:
+            lines.append(f"(caps {', '.join('@' + str(c) for c in inert)} are at or "
+                         f"beyond the run's retrieval depth k={m.retrieval_k}, so they "
+                         f"equal the uncapped MRR)")
+
+        lines += self._grid(m)
+
+        lines += [
+            "",
+            "Latency (warm; each item is itself the median of the Runner's "
+            "repeat trials)",
+            f"{'condition':<{w}} | {'median':>10} | {'p95':>10} | {'n':>4}",
+            "-" * (w + 33),
+        ]
+        for c in conds:
+            lines.append(f"{c:<{w}} | {m.median_latency(c):>7.1f} ms | "
+                         f"{m.latency_percentile(c, 95):>7.1f} ms | "
+                         f"{m.latency_n(c):>4}")
         return "\n".join(lines)
+
+    def _grid(self, m: Metrics) -> list[str]:
+        """The 2x2 read as a grid: the filter delta down one axis, the raw-vs-
+        semantic delta across the other. Only drawn when all four cells ran —
+        a partial matrix has no interpretable margins."""
+        conds = m.conditions()
+        if len(conds) < len(CONDITIONS) or not all(c.name in conds for c in CONDITIONS):
+            return ["", "(2x2 grid omitted — this run produced "
+                    f"{len(conds)} of {len(CONDITIONS)} conditions)"]
+        cap = self.headline_cap(m)
+        val = lambda text, filt: m.mrr(f"{text}+{'filter' if filt else 'nofilter'}", cap)
+        label = f"MRR@{cap}" if cap else "MRR (uncapped)"
+        out = [
+            "",
+            f"The 2x2 — {label}, over the {len(m.comparable())} comparable items",
+            f"{'':<10} | {'no-filter':>10} | {'filter':>10} | {'Δ filter':>10}",
+            "-" * 49,
+        ]
+        for text in ("raw", "semantic"):
+            nf, f = val(text, False), val(text, True)
+            out.append(f"{text:<10} | {nf:>10.3f} | {f:>10.3f} | {f - nf:>+10.3f}")
+        d_nf = val("semantic", False) - val("raw", False)
+        d_f = val("semantic", True) - val("raw", True)
+        out.append(f"{'Δ semantic':<10} | {d_nf:>+10.3f} | {d_f:>+10.3f} |")
+        out.append("(Δ filter = pushing the attribute into a predicate; "
+                   "Δ semantic = isolating the semantic remainder)")
+        return out
 
 
 def _recall_at_k(retrieved: list[str], gt: list[str] | None, k: int) -> float:

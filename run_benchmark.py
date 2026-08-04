@@ -17,6 +17,7 @@ import os
 from frame import Analyzer, Runner, load_query_set
 from frame.adapters import PgvectorAdapter
 from frame.core.encode import CachingEncoder, SiglipEncoder
+from frame.core.schema import PRIMARY_FILTERED
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -77,14 +78,19 @@ def run_and_score(system, encoder, items, k, warmup, repeat, adapter_kwargs, lab
 
 
 def print_sweep_comparison(results_by_mode, k):
-    print("\n" + "=" * 60)
-    print(f"iterative_scan sweep — filtered condition (k={k})")
-    print("=" * 60)
-    print(f"{'mode':>14} | {'recall@'+str(k):>11} | {'MRR':>6} | {'med lat ms':>11}")
-    print("-" * 60)
+    # The knob only affects the FILTER cells (it governs how the planner walks the
+    # index under a predicate), so the sweep is reported on the primary filtered
+    # condition rather than averaged across the 2x2.
+    cond = PRIMARY_FILTERED
+    print("\n" + "=" * 66)
+    print(f"iterative_scan sweep — {cond} condition (k={k})")
+    print("=" * 66)
+    print(f"{'mode':>14} | {'recall@'+str(k):>11} | {'MRR':>6} | {'med lat ms':>11} | {'p95':>8}")
+    print("-" * 66)
     for mode, m in results_by_mode.items():
-        print(f"{mode:>14} | {m.mean_recall_filtered(k):>11.3f} | "
-              f"{m.mrr_filtered():>6.3f} | {m.median_latency_filtered():>11.1f}")
+        print(f"{mode:>14} | {m.mean_recall(cond, k):>11.3f} | "
+              f"{m.mrr(cond):>6.3f} | {m.median_latency(cond):>11.1f} | "
+              f"{m.latency_percentile(cond, 95):>8.1f}")
 
 
 def main():

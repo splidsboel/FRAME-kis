@@ -57,8 +57,10 @@ def enriched_item(authored_item) -> dict:
         "target_keyframe_ids": ["kf_target"],
         "target_passes_filter": True,
         "filter_selectivity": [0.1],
+        # one exact answer per 2x2 cell — no cell is scored against a stand-in
         "geometric_gt_filtered": ["kf_target", "kf_a", "kf_b", "kf_c"],
         "geometric_gt_nofilter": ["kf_x", "kf_y", "kf_z"],
+        "geometric_gt_raw_filtered": ["kf_target", "kf_a", "kf_m"],
         "geometric_gt_vec_nofilter": ["kf_target", "kf_p", "kf_q", "kf_r"],
     }
     return item

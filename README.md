@@ -113,7 +113,7 @@ sbatch run_benchmark.sh --system mysystem              # per run
 ```
 
 Register it in `run_benchmark.py` + `scripts/load_dataset.py` and run. The shared `Runner` (drives the queries,
-both conditions, timings) and `Analyzer` (scores against the oracle ground truth)
+all four conditions, timings) and `Analyzer` (scores against the oracle ground truth)
 are reused unchanged, so every system is measured the same way.
 
 ## Repository layout
@@ -147,9 +147,16 @@ root (e.g. `sbatch build_gt.sh …`, `sbatch scripts/author_probe.sh …`).
   universe; only the retrieval/filtering under test varies.
 - **One deep run.** Each query retrieves a large `k` once; the analyzer derives
   Recall@k at smaller cutoffs from that single ranked list.
-- **Two conditions per query** embed different text: the filtered condition embeds
-  the semantic remainder and applies predicates; the unfiltered condition embeds
-  the full original query with no predicate.
+- **The 2×2 condition matrix.** Every query runs four cells — `{raw_query_text,
+  vector_query} × {predicate, no predicate}` — so the two deltas are separable: what
+  pushing an attribute into a filter costs or buys, and what isolating the semantic
+  remainder does. Each cell is scored against **its own** exact oracle answer. Items
+  with no predicate run only the two no-filter cells (the filter cells would be the
+  same search). Conditions are defined once in `frame/core/schema.py:CONDITIONS`.
+- **Aggregates use one common subset.** Cross-condition numbers cover only items
+  scorable in *every* condition, because the no-filter cells are scorable for items
+  the filter cells are not — averaging each over its own subset would compare
+  different query sets and read the difference as a condition effect.
 - Adapters return **ranked ids only** — sufficient for Recall@k and MRR.
 
 ## Tests

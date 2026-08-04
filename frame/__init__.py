@@ -12,6 +12,9 @@ from .core.profile import Profiler, SelectivityProfile
 from .core.runner import Runner
 from .core.sweep import Sweeper, SweepCell
 from .core.schema import (
+    CONDITION_NAMES,
+    CONDITIONS,
+    Condition,
     GroundTruth,
     Metrics,
     Predicate,
@@ -23,6 +26,9 @@ from .core.schema import (
 
 __all__ = [
     "VectorDBAdapter",
+    "Condition",
+    "CONDITIONS",
+    "CONDITION_NAMES",
     "Dataset",
     "Runner",
     "Analyzer",

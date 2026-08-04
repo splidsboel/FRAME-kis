@@ -48,6 +48,45 @@ class Predicate:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# The 2x2 condition matrix (Omar, 28-07-2026). Two axes:
+#   TEXT      raw_query_text (the full user phrasing) vs vector_query (the isolated
+#             semantic remainder, with the filterable attribute taken out)
+#   PREDICATE the AND-ed structured filter applied, or not
+#
+# Every cell is one Condition, and everything downstream derives from this table:
+# the Runner reads `text_attr` off the QueryItem to know what to embed, the
+# Analyzer reads `gt_attr` off the GroundTruth to know what exact answer to score
+# against. Adding a fifth condition is one row here plus its oracle GT — no
+# changes in the Runner, Analyzer, or figures.
+#
+# The two DIAGONAL cells (semantic+filter, raw+nofilter) were the only ones the
+# Runner produced before 2026-08-04; results files from then carry just those two.
+# ─────────────────────────────────────────────────────────────────────────────
+@dataclass(frozen=True)
+class Condition:
+    name: str            # stable key in results files — do not rename casually
+    text_attr: str       # QueryItem attribute holding the text to embed
+    filtered: bool       # apply the item's predicate?
+    gt_attr: str         # GroundTruth attribute holding this cell's exact answer
+
+
+CONDITIONS: tuple[Condition, ...] = (
+    Condition("raw+nofilter",      "raw_query_text", False, "gt_nofilter"),
+    Condition("raw+filter",        "raw_query_text", True,  "gt_raw_filtered"),
+    Condition("semantic+nofilter", "vector_query",   False, "gt_vec_nofilter"),
+    Condition("semantic+filter",   "vector_query",   True,  "gt_filtered"),
+)
+CONDITION_NAMES: tuple[str, ...] = tuple(c.name for c in CONDITIONS)
+BY_NAME: dict[str, Condition] = {c.name: c for c in CONDITIONS}
+
+# The pair the suite led with before the full 2x2 — "push the attribute into a
+# filter" vs "leave it in the CLIP query". Still the headline comparison, and the
+# mapping legacy two-condition results files are read back as.
+PRIMARY_FILTERED = "semantic+filter"
+PRIMARY_UNFILTERED = "raw+nofilter"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Ground truth for one item — read out of the item's `computed` block.
 # Field names mirror queryset/build.py's computed_stub / oracle/build_gt.py output.
 # `None` means "not yet computed on the HPC" (item still pending GT).
@@ -58,17 +97,37 @@ class GroundTruth:
     target_keyframe_ids: list[str] | None
     target_passes_filter: bool | None
     filter_selectivity: list[float | None]
-    gt_filtered: list[str] | None      # exact filtered k-NN keyframe ids (ranked)
-    gt_nofilter: list[str] | None      # exact unfiltered k-NN keyframe ids (ranked, RAW query text)
-    gt_vec_nofilter: list[str] | None  # exact unfiltered k-NN of the vector_query (no filter);
-                                       # the neighbour list the filtered HNSW walk actually traverses,
-                                       # used by the profiler for near-query pass-rate
+    # One exact answer per condition (see CONDITIONS above). All four are computed
+    # by the same oracle pass, so no cell is scored against a stand-in.
+    gt_filtered: list[str] | None      # vector_query + filter    (semantic+filter)
+    gt_nofilter: list[str] | None      # raw_query_text, no filter (raw+nofilter)
+    gt_raw_filtered: list[str] | None  # raw_query_text + filter   (raw+filter)
+    gt_vec_nofilter: list[str] | None  # vector_query, no filter   (semantic+nofilter);
+                                       # also the neighbour list the filtered HNSW walk
+                                       # traverses, used by the profiler for pass-rate
 
     @property
     def is_scorable(self) -> bool:
-        """An item can be scored only once its filtered GT exists AND its own
-        target survives the filter (else Recall@k is 0 by construction)."""
-        return bool(self.gt_filtered) and self.target_passes_filter is True
+        """Whether the PRIMARY filtered cell can be scored. Kept as the historical
+        headline gate; per-cell scorability is `scorable_for`."""
+        return self.scorable_for(BY_NAME[PRIMARY_FILTERED])
+
+    def gt_for(self, cond: Condition) -> list[str] | None:
+        return getattr(self, cond.gt_attr)
+
+    def scorable_for(self, cond: Condition) -> bool:
+        """A cell is scorable once its own exact answer exists and — for the two
+        FILTER cells only — the target survives the filter, else Recall@k is 0 by
+        construction. The no-filter cells are deliberately NOT gated on
+        target_passes_filter: whether a predicate would have excluded the target
+        says nothing about a run that applied no predicate, and gating them would
+        throw away a valid measurement (e.g. the OCR harm exemplar q0006, whose
+        target is rank 1 unfiltered)."""
+        if not self.gt_for(cond):
+            return False
+        if cond.filtered and self.target_passes_filter is not True:
+            return False
+        return True
 
     @classmethod
     def from_item(cls, item: dict) -> "GroundTruth":
@@ -80,6 +139,7 @@ class GroundTruth:
             filter_selectivity=c.get("filter_selectivity") or [],
             gt_filtered=c.get("geometric_gt_filtered"),
             gt_nofilter=c.get("geometric_gt_nofilter"),
+            gt_raw_filtered=c.get("geometric_gt_raw_filtered"),
             gt_vec_nofilter=c.get("geometric_gt_vec_nofilter"),
         )
 
@@ -133,23 +193,38 @@ def load_query_set(path: str) -> list[QueryItem]:
 @dataclass
 class RawResult:
     query_id: str
-    filtered_ids: list[str]            # ranked, best-first (filtered condition)
-    unfiltered_ids: list[str]          # ranked, best-first (no-filter condition)
-    latency_filtered_ms: float
-    latency_unfiltered_ms: float
+    # condition name -> ranked ids / warm median latency. Keyed rather than four
+    # flat fields so a condition can be absent (an item with no predicate has no
+    # meaningful FILTER cell) and so adding a condition doesn't reshape the file.
+    ids: dict[str, list[str]] = field(default_factory=dict)
+    latency_ms: dict[str, float] = field(default_factory=dict)
+
+    def conditions(self) -> list[str]:
+        return [c for c in CONDITION_NAMES if c in self.ids]
 
     def to_dict(self) -> dict:
         return {
             "query_id": self.query_id,
-            "filtered_ids": self.filtered_ids,
-            "unfiltered_ids": self.unfiltered_ids,
-            "latency_filtered_ms": self.latency_filtered_ms,
-            "latency_unfiltered_ms": self.latency_unfiltered_ms,
+            "ids": self.ids,
+            "latency_ms": self.latency_ms,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "RawResult":
-        return cls(**d)
+        if "ids" in d:
+            return cls(query_id=d["query_id"], ids=d["ids"],
+                       latency_ms=d.get("latency_ms", {}))
+        # Legacy two-condition file (pre-2026-08-04): `filtered` meant
+        # vector_query + predicate, `unfiltered` meant raw_query_text alone.
+        # Read it back as exactly those two cells so old runs stay analysable —
+        # they simply have two of the four.
+        return cls(
+            query_id=d["query_id"],
+            ids={PRIMARY_FILTERED: d["filtered_ids"],
+                 PRIMARY_UNFILTERED: d["unfiltered_ids"]},
+            latency_ms={PRIMARY_FILTERED: d["latency_filtered_ms"],
+                        PRIMARY_UNFILTERED: d["latency_unfiltered_ms"]},
+        )
 
 
 @dataclass
@@ -180,42 +255,34 @@ class RawResults:
 # ─────────────────────────────────────────────────────────────────────────────
 @dataclass
 class QueryMetrics:
+    """One item's scores, per condition. Every dict is keyed by condition name and
+    holds only the conditions the run actually produced for this item."""
+
     query_id: str
-    scorable: bool
-    recall_filtered: dict[int, float]     # k -> recall@k vs oracle filtered GT
-    recall_unfiltered: dict[int, float]   # k -> recall@k vs oracle unfiltered GT
-    target_rank_filtered: int | None      # 1-based rank of best target keyframe
-    target_rank_unfiltered: int | None
-    latency_filtered_ms: float
-    latency_unfiltered_ms: float
+    scorable: dict[str, bool]                   # condition -> cell has valid GT
+    recall: dict[str, dict[int, float]]         # condition -> k -> recall@k
+    target_rank: dict[str, int | None]          # condition -> 1-based rank of target
+    latency_ms: dict[str, float]                # condition -> warm median latency
 
-    @property
-    def rr_filtered(self) -> float:
-        """Uncapped reciprocal rank. For a capped MRR use Metrics.mrr_filtered(cap)."""
-        return _reciprocal_rank(self.target_rank_filtered, None)
+    def conditions(self) -> list[str]:
+        return [c for c in CONDITION_NAMES if c in self.target_rank]
 
-    @property
-    def rr_unfiltered(self) -> float:
-        return _reciprocal_rank(self.target_rank_unfiltered, None)
+    def is_scorable(self, cond: str) -> bool:
+        return self.scorable.get(cond, False)
 
-    def rr_filtered_at(self, cap: int | None) -> float:
-        return _reciprocal_rank(self.target_rank_filtered, cap)
-
-    def rr_unfiltered_at(self, cap: int | None) -> float:
-        return _reciprocal_rank(self.target_rank_unfiltered, cap)
+    def rr(self, cond: str, cap: int | None = None) -> float:
+        """Reciprocal rank in one condition; a target deeper than `cap` is a miss."""
+        return _reciprocal_rank(self.target_rank.get(cond), cap)
 
     def to_dict(self) -> dict:
         return {
             "query_id": self.query_id,
             "scorable": self.scorable,
-            "recall_filtered": {str(k): v for k, v in self.recall_filtered.items()},
-            "recall_unfiltered": {str(k): v for k, v in self.recall_unfiltered.items()},
-            "target_rank_filtered": self.target_rank_filtered,
-            "target_rank_unfiltered": self.target_rank_unfiltered,
-            "rr_filtered": self.rr_filtered,
-            "rr_unfiltered": self.rr_unfiltered,
-            "latency_filtered_ms": self.latency_filtered_ms,
-            "latency_unfiltered_ms": self.latency_unfiltered_ms,
+            "recall": {c: {str(k): v for k, v in ks.items()}
+                       for c, ks in self.recall.items()},
+            "target_rank": self.target_rank,
+            "rr": {c: self.rr(c) for c in self.conditions()},
+            "latency_ms": self.latency_ms,
         }
 
 
@@ -229,55 +296,75 @@ class Metrics:
     # so MRR@cap for cap >= k is just the uncapped MRR wearing a hat. 0 = unknown.
     retrieval_k: int = 0
 
-    def _scorable(self) -> list[QueryMetrics]:
-        return [m for m in self.per_query if m.scorable]
+    def conditions(self) -> list[str]:
+        """Conditions this run produced, in canonical order."""
+        seen = {c for m in self.per_query for c in m.conditions()}
+        return [c for c in CONDITION_NAMES if c in seen]
 
     def cap_is_meaningful(self, cap: int) -> bool:
         """False when the cap is at or above the run's retrieval depth."""
         return self.retrieval_k > 0 and cap < self.retrieval_k
 
-    def mean_recall_filtered(self, k: int) -> float:
-        rows = self._scorable()
-        return _safe_mean([m.recall_filtered.get(k, 0.0) for m in rows])
+    # ── which items an aggregate covers ────────────────────────────────────────
+    # A cross-condition comparison is only honest over ONE common subset of items.
+    # Conditions have different scorable sets: the two no-filter cells are scorable
+    # for every item with GT, the two filter cells only for items that HAVE a filter
+    # whose target survives it. Averaging each condition over its own subset would
+    # compare a 37-item mean against a 30-item mean and read the difference as an
+    # effect of the condition. So `common=True` (the default) restricts every
+    # aggregate to items scorable in ALL of `conditions`.
+    def comparable(self, conditions: Sequence[str] | None = None) -> list[QueryMetrics]:
+        conds = list(conditions) if conditions is not None else self.conditions()
+        return [m for m in self.per_query if all(m.is_scorable(c) for c in conds)]
 
-    def mean_recall_unfiltered(self, k: int) -> float:
-        rows = self._scorable()
-        return _safe_mean([m.recall_unfiltered.get(k, 0.0) for m in rows])
+    def _rows(self, cond: str, common: bool) -> list[QueryMetrics]:
+        if common:
+            return self.comparable()
+        return [m for m in self.per_query if m.is_scorable(cond)]
+
+    def mean_recall(self, cond: str, k: int, common: bool = True) -> float:
+        return _safe_mean([m.recall.get(cond, {}).get(k, 0.0)
+                           for m in self._rows(cond, common)])
 
     # MRR at a capped rank (Omar, 28-07): a target found beyond `cap` counts as a
     # MISS, not as a small reciprocal. cap=None is the uncapped MRR. The cap models
     # how deep a VBS user would actually look — a target at rank 800 is a miss in
     # practice, but contributes 0.00125 to an uncapped MRR and so hides there.
-    def mrr_filtered(self, cap: int | None = None) -> float:
-        return _safe_mean([m.rr_filtered_at(cap) for m in self._scorable()])
-
-    def mrr_unfiltered(self, cap: int | None = None) -> float:
-        return _safe_mean([m.rr_unfiltered_at(cap) for m in self._scorable()])
+    def mrr(self, cond: str, cap: int | None = None, common: bool = True) -> float:
+        return _safe_mean([m.rr(cond, cap) for m in self._rows(cond, common)])
 
     # Latency is a system property independent of scorability, so it is summarised
-    # over ALL items (a filtered search still has a real cost when the target fails
-    # its own filter). Median over the per-query medians the Runner recorded.
-    def median_latency_filtered(self) -> float:
-        return _median([m.latency_filtered_ms for m in self.per_query])
+    # over every item that RAN the condition — a filtered search still has a real
+    # cost when the target fails its own filter. Median over the per-query medians
+    # the Runner recorded.
+    def _latencies(self, cond: str) -> list[float]:
+        return [m.latency_ms[cond] for m in self.per_query if cond in m.latency_ms]
 
-    def median_latency_unfiltered(self) -> float:
-        return _median([m.latency_unfiltered_ms for m in self.per_query])
+    def latency_n(self, cond: str) -> int:
+        """How many items actually ran this condition — differs between the filter
+        and no-filter cells, since items without a predicate skip the filter cells."""
+        return len(self._latencies(cond))
+
+    def median_latency(self, cond: str) -> float:
+        return _median(self._latencies(cond))
 
     # Tail latency ACROSS queries, not within one. Each per-query number is already
     # the median of `repeat` warm trials (Runner), so this asks "which queries are
     # slow", not "how noisy is one query" — with ~30 items a within-query p95 off 5
     # trials would be noise, while the across-query tail is where a planner cutover
     # or a broad filter shows up.
-    def latency_percentile_filtered(self, p: float = 95.0) -> float:
-        return _percentile([m.latency_filtered_ms for m in self.per_query], p)
-
-    def latency_percentile_unfiltered(self, p: float = 95.0) -> float:
-        return _percentile([m.latency_unfiltered_ms for m in self.per_query], p)
+    def latency_percentile(self, cond: str, p: float = 95.0) -> float:
+        return _percentile(self._latencies(cond), p)
 
     def write_jsonl(self, path: str) -> None:
         with open(path, "w") as f:
-            f.write(json.dumps({"system": self.system, "ks": list(self.ks),
-                                "retrieval_k": self.retrieval_k}) + "\n")
+            f.write(json.dumps({
+                "system": self.system,
+                "ks": list(self.ks),
+                "retrieval_k": self.retrieval_k,
+                "conditions": self.conditions(),
+                "n_comparable": len(self.comparable()),
+            }) + "\n")
             for m in self.per_query:
                 f.write(json.dumps(m.to_dict()) + "\n")
 

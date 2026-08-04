@@ -66,7 +66,7 @@ one shared palette.
 
 | script | reads | figures |
 |---|---|---|
-| `plot_metrics.py` | `data/metrics.<system>.jsonl` (Analyzer) | `rank_distribution` (boxplot of target rank per condition, every query overlaid), `mrr_caps` (MRR at {1000,100,50,10}), `recall_at_k` |
+| `plot_metrics.py` | `data/metrics.<system>.jsonl` (Analyzer) | `rank_distribution` (boxplot of target rank per condition, every query overlaid), `mrr_caps` (MRR at {1000,100,50,10}), `recall_at_k`, `condition_grid` (the 2×2 with both margins) |
 | `plot_query_selectivity.py` | `data/profile.<system>.jsonl` (Profiler) | `query_selectivity`, `conjunction_parts` |
 | `plot_cutover.py` | `data/sweep.<system>.*.jsonl` (Sweeper) | exact↔approximate cutover |
 | `plot_data_stats.py` | `data/data_stats.json` | corpus/metadata characterization |
@@ -75,6 +75,7 @@ one shared palette.
 uv run python scripts/plot_metrics.py --in data/metrics.pgvector.jsonl
 ```
 
-`plot_metrics.py` defines the conditions it compares in one function
-(`conditions()`); when the Runner grows the full 2×2, extend that and all three
-figures follow.
+`plot_metrics.py` reads the conditions out of the metrics header, so it renders
+whatever the run produced — all four 2×2 cells, or the two cells a pre-2026-08-04
+results file carries (those are re-keyed onto the matching cells automatically).
+Every figure is computed over the items scorable in *all* of the run's conditions.

@@ -52,11 +52,16 @@ def computed_stub(item):
         "target_keyframe_ids": None,       # join shots/keyframes on target time range
         "target_passes_filter": None,      # target must satisfy the filter or item is broken
         "filter_selectivity": [None] * n,  # corpus fraction each filter keeps
-        "geometric_gt_filtered": None,     # exact filtered k-NN keyframe ids
-        "geometric_gt_nofilter": None,     # exact unfiltered k-NN (no-filter condition)
+        # One exact answer per cell of the 2x2 condition matrix
+        # (frame.core.schema.CONDITIONS) — no cell is scored against a stand-in.
+        "geometric_gt_filtered": None,      # vector_query + filter    (semantic+filter)
+        "geometric_gt_nofilter": None,      # raw_query_text, no filter (raw+nofilter)
+        "geometric_gt_raw_filtered": None,  # raw_query_text + filter   (raw+filter)
+        "geometric_gt_vec_nofilter": None,  # vector_query, no filter   (semantic+nofilter)
         "_pending": [
             "target_keyframe_ids", "target_passes_filter", "filter_selectivity",
             "geometric_gt_filtered", "geometric_gt_nofilter",
+            "geometric_gt_raw_filtered", "geometric_gt_vec_nofilter",
         ],
     }
 

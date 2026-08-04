@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
+
 from frame.core.runner import Runner
-from frame.core.schema import QueryItem
+from frame.core.schema import CONDITION_NAMES, QueryItem
 
 
 def test_run_produces_one_result_per_item(enriched_item, fake_adapter, fake_encoder):
@@ -16,43 +18,59 @@ def test_run_produces_one_result_per_item(enriched_item, fake_adapter, fake_enco
     assert len(raw.results) == 1
     r = raw.results[0]
     assert r.query_id == "q0001"
-    assert r.filtered_ids == ["kf_target", "kf_a", "kf_z"]
-    assert r.unfiltered_ids == ["kf_x", "kf_target", "kf_y"]
+    assert r.conditions() == list(CONDITION_NAMES)          # full 2x2
+    assert r.ids["semantic+filter"] == ["kf_target", "kf_a", "kf_z"]
+    assert r.ids["raw+nofilter"] == ["kf_x", "kf_target", "kf_y"]
 
 
-def test_run_encodes_both_texts(enriched_item, fake_adapter, fake_encoder):
+def test_run_covers_the_full_2x2(enriched_item, fake_adapter, fake_encoder):
+    item = QueryItem.from_dict(enriched_item)
+    raw = Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run([item], k=5)
+    r = raw.results[0]
+    assert set(r.ids) == set(CONDITION_NAMES)
+    assert set(r.latency_ms) == set(CONDITION_NAMES)
+    # two cells apply the predicate, two do not
+    n_filters_seen = sorted(nf for nf, _ in fake_adapter.search_calls)
+    assert n_filters_seen == [0, 0, 1, 1]
+    assert {k for _, k in fake_adapter.search_calls} == {5}
+
+
+def test_run_encodes_each_text_once_per_item(enriched_item, fake_adapter, fake_encoder):
     item = QueryItem.from_dict(enriched_item)
     Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run([item], k=5)
-    # filtered condition encodes vector_query, no-filter encodes raw_query_text
-    assert item.vector_query in fake_encoder.calls
-    assert item.raw_query_text in fake_encoder.calls
+    # 4 cells but only 2 distinct texts — the filter axis must be measured against
+    # an identical query vector, so each text is encoded once and shared
+    assert fake_encoder.calls.count(item.vector_query) == 1
+    assert fake_encoder.calls.count(item.raw_query_text) == 1
 
 
-def test_run_filtered_gets_predicates_nofilter_gets_none(
+def test_item_without_predicate_skips_the_filter_cells(
     enriched_item, fake_adapter, fake_encoder
 ):
-    item = QueryItem.from_dict(enriched_item)
-    Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run([item], k=5)
-    # two searches: one with the item's filters, one with zero filters
-    n_filters_seen = sorted(nf for nf, _ in fake_adapter.search_calls)
-    assert n_filters_seen == [0, 1]
-    # both priced at the same k
-    assert {k for _, k in fake_adapter.search_calls} == {5}
+    # an empty predicate makes the filter cells identical to the no-filter cells;
+    # running them would manufacture two duplicate numbers
+    unfiltered = copy.deepcopy(enriched_item)
+    unfiltered["decomposition"]["filters"] = []
+    item = QueryItem.from_dict(unfiltered)
+    raw = Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run([item], k=5)
+    r = raw.results[0]
+    assert r.conditions() == ["raw+nofilter", "semantic+nofilter"]
+    assert len(fake_adapter.search_calls) == 2
 
 
 def test_warmup_and_repeat_control_search_count(enriched_item, fake_adapter, fake_encoder):
     item = QueryItem.from_dict(enriched_item)
     Runner(fake_adapter, fake_encoder, warmup=2, repeat=3).run([item], k=5)
-    # per condition: warmup(2) + repeat(3) = 5 searches; two conditions => 10
-    assert len(fake_adapter.search_calls) == 10
+    # per cell: warmup(2) + repeat(3) = 5 searches; four cells => 20
+    assert len(fake_adapter.search_calls) == 20
 
 
-def test_latency_is_non_negative(enriched_item, fake_adapter, fake_encoder):
+def test_latency_recorded_per_condition(enriched_item, fake_adapter, fake_encoder):
     item = QueryItem.from_dict(enriched_item)
     raw = Runner(fake_adapter, fake_encoder, warmup=1, repeat=3).run([item], k=5)
     r = raw.results[0]
-    assert r.latency_filtered_ms >= 0.0
-    assert r.latency_unfiltered_ms >= 0.0
+    assert set(r.latency_ms) == set(CONDITION_NAMES)
+    assert all(v >= 0.0 for v in r.latency_ms.values())
 
 
 def test_runner_clamps_degenerate_warmup_repeat(fake_adapter, fake_encoder):

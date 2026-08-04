@@ -11,20 +11,25 @@ same validated palette as plot_query_selectivity.py / plot_cutover.py.
 
   1. rank_distribution — BOXPLOT of the target's rank per condition, log scale, with
                          every query overlaid as a jittered point. The mean/median
-                         rank gap in the 2x2 run is large enough that a single number
-                         per condition misleads; the distribution is the honest view.
-                         Targets never found are NOT silently dropped — they cannot
-                         go on a rank axis, so each box is annotated with how many
-                         of the scorable queries it actually contains.
-  2. mrr_caps          — MRR at rank caps {1000,100,50,10}, filtered vs no-filter.
+                         rank gap across conditions is large enough that a single
+                         number per condition misleads; the distribution is the
+                         honest view. Targets never found are NOT silently dropped —
+                         they cannot go on a rank axis, so each box is annotated with
+                         how many of the items it actually contains.
+  2. mrr_caps          — MRR at rank caps {1000,100,50,10}, per condition.
                          Recomputed here from the per-query ranks (the jsonl carries
-                         uncapped rr only), so it matches Metrics.mrr_filtered(cap).
+                         uncapped rr only), so it matches Metrics.mrr(cond, cap).
                          Caps at or beyond the run's retrieval depth are hatched:
                          no rank beyond k exists, so those bars are the uncapped MRR.
-  3. recall_at_k       — mean Recall@k vs the oracle's exact k-NN, per condition.
+  3. recall_at_k       — mean Recall@k, each condition against ITS OWN exact k-NN.
+  4. condition_grid    — the 2x2 read as a matrix, with both margins: the filter
+                         delta and the raw-vs-semantic delta. Only drawn when all
+                         four cells ran.
 
-Conditions are built in one place (`conditions()`), so when the Runner grows the
-full 2x2 the figures follow by extending that function alone.
+EVERY figure is computed over the items scorable in ALL of the run's conditions
+(`comparable`). Averaging each condition over its own scorable set would compare
+different query subsets — the no-filter cells are scorable for items that have no
+predicate at all — and the difference would read as a condition effect.
 """
 
 from __future__ import annotations
@@ -67,43 +72,69 @@ def save(fig, out, name):
     print(f"  {name}.pdf / .png")
 
 
+CANONICAL_ORDER = ("raw+nofilter", "raw+filter", "semantic+nofilter", "semantic+filter")
+COND_COLOR = {"raw+nofilter": BLUE, "raw+filter": ORANGE,
+              "semantic+nofilter": GREEN, "semantic+filter": MAGENTA}
+# Two lines so a four-condition axis stays readable.
+COND_LABEL = {"raw+nofilter": "raw\nno-filter", "raw+filter": "raw\n+ filter",
+              "semantic+nofilter": "semantic\nno-filter",
+              "semantic+filter": "semantic\n+ filter"}
+
+
 def load_metrics(path):
-    """-> (header dict, list of per-query rows)."""
+    """-> (header dict, list of per-query rows), normalising legacy files.
+
+    Pre-2026-08-04 runs stored two flat conditions (`recall_filtered`,
+    `target_rank_filtered`, ...). Those meant vector_query+predicate and
+    raw_query_text alone, so they are re-keyed onto the two matching 2x2 cells
+    rather than being unplottable — such a run simply has two of the four.
+    """
     rows = [json.loads(l) for l in open(path) if l.strip()]
     header = rows[0] if rows and "query_id" not in rows[0] else {}
-    return header, [r for r in rows if "query_id" in r]
+    rows = [r for r in rows if "query_id" in r]
+
+    if rows and "recall" not in rows[0]:
+        for r in rows:
+            ok = bool(r.get("scorable"))
+            r["scorable"] = {"semantic+filter": ok, "raw+nofilter": ok}
+            r["recall"] = {"semantic+filter": r.pop("recall_filtered", {}),
+                           "raw+nofilter": r.pop("recall_unfiltered", {})}
+            r["target_rank"] = {"semantic+filter": r.pop("target_rank_filtered", None),
+                                "raw+nofilter": r.pop("target_rank_unfiltered", None)}
+            r["latency_ms"] = {"semantic+filter": r.pop("latency_filtered_ms", 0.0),
+                               "raw+nofilter": r.pop("latency_unfiltered_ms", 0.0)}
+        header.setdefault("conditions", ["raw+nofilter", "semantic+filter"])
+        print("  [note] legacy two-condition metrics file — re-keyed onto the "
+              "matching 2x2 cells")
+    return header, rows
 
 
-def conditions():
-    """The conditions to compare, in plot order.
-
-    ONE place defines what a condition is: a label, its colour, and how to pull that
-    condition's rank / recall out of a per-query row. The Runner currently produces
-    the two diagonal cells of the 2x2 (semantic+filter, raw+no-filter); when it
-    produces all four, add them here and every figure below picks them up.
-    """
-    return [
-        ("filtered\n(semantic + predicate)", ORANGE,
-         "target_rank_filtered", "recall_filtered"),
-        ("no-filter\n(raw query)", BLUE,
-         "target_rank_unfiltered", "recall_unfiltered"),
-    ]
+def conditions(header, rows):
+    """Conditions present in this run, in canonical 2x2 order."""
+    named = header.get("conditions")
+    if not named:
+        named = sorted({c for r in rows for c in (r.get("target_rank") or {})})
+    return [c for c in CANONICAL_ORDER if c in named] + \
+           [c for c in named if c not in CANONICAL_ORDER]
 
 
-def scorable(rows):
-    """Only items with self-consistent GT carry meaningful ranks — the Analyzer
-    leaves rank=None on the rest, which is NOT the same as 'not found'."""
-    return [r for r in rows if r.get("scorable")]
+def comparable(rows, conds):
+    """Items scorable in EVERY condition — the one common subset a cross-condition
+    comparison may use. Averaging each condition over its own scorable set would
+    compare different query subsets and read the difference as a condition effect
+    (mirrors Metrics.comparable)."""
+    return [r for r in rows
+            if all((r.get("scorable") or {}).get(c) for c in conds)]
 
 
-def _mrr(rows, rank_key, cap):
-    """Mean reciprocal rank over scorable items, target beyond `cap` counting as a
+def _mrr(rows, cond, cap):
+    """Mean reciprocal rank in one condition, target beyond `cap` counting as a
     miss. Mirrors schema._reciprocal_rank so figures and printed summary agree."""
     if not rows:
         return 0.0
     total = 0.0
     for r in rows:
-        rank = r.get(rank_key)
+        rank = (r.get("target_rank") or {}).get(cond)
         if rank and (cap is None or rank <= cap):
             total += 1.0 / rank
     return total / len(rows)
@@ -111,24 +142,23 @@ def _mrr(rows, rank_key, cap):
 
 # ─── 1. rank distribution ───────────────────────────────────────────────────
 
-def plot_rank_distribution(rows, out, system):
-    rows = scorable(rows)
+def plot_rank_distribution(rows, out, system, conds):
+    rows = comparable(rows, conds)
     if not rows:
-        print("  (no scorable items — skipping rank_distribution)")
+        print("  (no comparable items — skipping rank_distribution)")
         return
 
-    conds = conditions()
     data, colors, labels = [], [], []
-    for label, color, rank_key, _ in conds:
-        ranks = [r[rank_key] for r in rows if r.get(rank_key)]
+    for cond in conds:
+        ranks = [r["target_rank"][cond] for r in rows if r["target_rank"].get(cond)]
         misses = len(rows) - len(ranks)
         data.append(ranks or [np.nan])
-        colors.append(color)
+        colors.append(COND_COLOR.get(cond, GRAY))
         # A box drawn over 12 of 15 queries is a different claim from one drawn over
         # all 15. Put the count in the tick label itself so it cannot be cropped or
         # read as belonging to the neighbouring box.
         note = f"n={len(ranks)}/{len(rows)}" + (f", {misses} not found" if misses else "")
-        labels.append(f"{label}\n{note}")
+        labels.append(f"{COND_LABEL.get(cond, cond)}\n{note}")
 
     fig, ax = plt.subplots(figsize=(1.9 * len(conds) + 3.0, 5.0))
     x = np.arange(1, len(conds) + 1)
@@ -160,19 +190,20 @@ def plot_rank_distribution(rows, out, system):
     ax.axhline(1, color=GREEN, linewidth=0.9, linestyle=":", zorder=1)
     ax.annotate("rank 1", (0.02, 1), xycoords=("axes fraction", "data"),
                 xytext=(0, 4), textcoords="offset points", fontsize=7, color=GREEN)
-    ax.set_title(f"Target-rank distribution by condition — {system}")
+    ax.set_title(f"Target-rank distribution by condition — {system}\n"
+                 f"({len(rows)} items scorable in all {len(conds)} conditions)",
+                 fontsize=10)
     save(fig, out, "rank_distribution")
 
 
 # ─── 2. MRR at rank caps ────────────────────────────────────────────────────
 
-def plot_mrr_caps(rows, out, system, retrieval_k):
-    rows = scorable(rows)
+def plot_mrr_caps(rows, out, system, retrieval_k, conds):
+    rows = comparable(rows, conds)
     if not rows:
-        print("  (no scorable items — skipping mrr_caps)")
+        print("  (no comparable items — skipping mrr_caps)")
         return
 
-    conds = conditions()
     caps = list(MRR_CAPS)
     x = np.arange(len(caps))
     width = 0.8 / len(conds)
@@ -181,20 +212,21 @@ def plot_mrr_caps(rows, out, system, retrieval_k):
     # the uncapped MRR and must not read as an independent measurement.
     inert = [bool(retrieval_k) and c >= retrieval_k for c in caps]
 
-    fig, ax = plt.subplots(figsize=(1.4 * len(caps) + 3.0, 4.4))
+    fig, ax = plt.subplots(figsize=(1.8 * len(caps) + 3.5, 4.4))
     top = 0.0
-    for i, (_label, color, rank_key, _) in enumerate(conds):
-        vals = [_mrr(rows, rank_key, c) for c in caps]
+    for i, cond in enumerate(conds):
+        vals = [_mrr(rows, cond, c) for c in caps]
         top = max(top, *vals)
         offs = x + (i - (len(conds) - 1) / 2) * width
-        bars = ax.bar(offs, vals, width=width * 0.92, color=color)
+        bars = ax.bar(offs, vals, width=width * 0.92, color=COND_COLOR.get(cond, GRAY))
         for bar, is_inert in zip(bars, inert):
             if is_inert:
                 bar.set_hatch("//")
                 bar.set_edgecolor("white")
         for xi, v in zip(offs, vals):
             ax.annotate(f"{v:.3f}", (xi, v), textcoords="offset points",
-                        xytext=(0, 3), ha="center", fontsize=7, color=INK2)
+                        xytext=(0, 3), ha="center", fontsize=6.5, color=INK2,
+                        rotation=90 if len(conds) > 2 else 0)
 
     ax.set_xticks(x)
     ax.set_xticklabels([f"@{c}" for c in caps])
@@ -202,46 +234,91 @@ def plot_mrr_caps(rows, out, system, retrieval_k):
     ax.set_ylabel("MRR")
     # Scale to the data, not to 1.0: KIS MRRs sit well under 0.5 and a fixed 0..1
     # axis flattens the differences between caps, which is the whole point here.
-    ax.set_ylim(0, max(0.1, top * 1.25))
+    ax.set_ylim(0, max(0.1, top * 1.35))
     ax.grid(axis="x", visible=False)
 
     # Legend built from plain swatches — letting bar containers supply the handles
     # copies the hatch of whichever bar came first and makes every condition look
     # inert.
-    handles = [Patch(facecolor=c, label=lbl.replace("\n", " "))
-               for lbl, c, _, _ in conds]
+    handles = [Patch(facecolor=COND_COLOR.get(c, GRAY), label=c) for c in conds]
     if any(inert):
         handles.append(Patch(facecolor="white", edgecolor=MUTED, hatch="//",
                              label=f"cap ≥ retrieved k={retrieval_k} (= uncapped)"))
-    ax.legend(handles=handles, frameon=False, loc="upper right", fontsize=8.5)
-    ax.set_title(f"MRR at rank caps — {system}")
+    ax.legend(handles=handles, frameon=False, loc="upper right", fontsize=8,
+              ncol=2 if len(handles) > 3 else 1)
+    ax.set_title(f"MRR at rank caps — {system} ({len(rows)} comparable items)")
     save(fig, out, "mrr_caps")
 
 
 # ─── 3. Recall@k ────────────────────────────────────────────────────────────
 
-def plot_recall_at_k(rows, out, system, ks):
-    rows = scorable(rows)
+def plot_recall_at_k(rows, out, system, ks, conds):
+    rows = comparable(rows, conds)
     if not rows or not ks:
-        print("  (no scorable items / no ks — skipping recall_at_k)")
+        print("  (no comparable items / no ks — skipping recall_at_k)")
         return
 
-    fig, ax = plt.subplots(figsize=(6.0, 4.2))
-    for label, color, _, recall_key in conditions():
-        means = [float(np.mean([r[recall_key].get(str(k), 0.0) for r in rows]))
-                 for k in ks]
-        ax.plot(ks, means, marker="o", color=color, linewidth=1.8,
-                markersize=5, label=label.replace("\n", " "))
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    for cond in conds:
+        means = [float(np.mean([(r["recall"].get(cond) or {}).get(str(k), 0.0)
+                                for r in rows])) for k in ks]
+        ax.plot(ks, means, marker="o", color=COND_COLOR.get(cond, GRAY),
+                linewidth=1.8, markersize=5, label=cond)
 
     ax.set_xscale("log")
     ax.set_xticks(ks)
     ax.set_xticklabels([str(k) for k in ks])
     ax.set_xlabel("k")
-    ax.set_ylabel("mean Recall@k vs the oracle's exact k-NN")
+    # Each condition is scored against ITS OWN oracle answer, so this compares how
+    # well the index reproduces four different exact rankings — not the conditions
+    # against one shared truth.
+    ax.set_ylabel("mean Recall@k vs that condition's exact k-NN")
     ax.set_ylim(0, 1.02)
-    ax.legend(frameon=False, loc="lower right")
-    ax.set_title(f"Geometric correctness — {system} ({len(rows)} scorable queries)")
+    ax.legend(frameon=False, loc="lower right", fontsize=8.5)
+    ax.set_title(f"Geometric correctness — {system} ({len(rows)} comparable items)")
     save(fig, out, "recall_at_k")
+
+
+# ─── 4. the 2x2 grid ────────────────────────────────────────────────────────
+
+def plot_condition_grid(rows, out, system, retrieval_k, conds):
+    """The matrix read as a matrix: filter delta down one axis, raw-vs-semantic
+    across the other. Only drawn when all four cells ran — a partial matrix has no
+    interpretable margins."""
+    if not all(c in conds for c in CANONICAL_ORDER):
+        print("  (partial condition matrix — skipping condition_grid)")
+        return
+    rows = comparable(rows, conds)
+    if not rows:
+        print("  (no comparable items — skipping condition_grid)")
+        return
+
+    cap = next((c for c in sorted(MRR_CAPS, reverse=True)
+                if not retrieval_k or c < retrieval_k), min(MRR_CAPS))
+    grid = np.array([[_mrr(rows, f"{t}+{p}", cap) for p in ("nofilter", "filter")]
+                     for t in ("raw", "semantic")])
+
+    fig, ax = plt.subplots(figsize=(5.4, 4.4))
+    ax.grid(False)          # the global grid rcParam draws lines through the cells
+    im = ax.imshow(grid, cmap="YlGnBu", vmin=0, vmax=max(grid.max() * 1.1, 0.05))
+    ax.set_xticks([0, 1], ["no filter", "+ filter"])
+    ax.set_yticks([0, 1], ["raw\nquery text", "semantic\nremainder"])
+    for i in range(2):
+        for j in range(2):
+            # Contrast against the colormap rather than a fixed ink colour.
+            colour = "white" if grid[i, j] > grid.max() * 0.6 else INK
+            ax.annotate(f"{grid[i, j]:.3f}", (j, i), ha="center", va="center",
+                        fontsize=15, color=colour)
+    ax.set_title(f"The 2×2 — MRR@{cap} — {system}\n"
+                 f"({len(rows)} items scorable in all four cells)", fontsize=10)
+    fig.colorbar(im, ax=ax, shrink=0.75, label=f"MRR@{cap}")
+    # The margins are the two deltas the matrix exists to separate.
+    d_filter = grid[:, 1] - grid[:, 0]
+    d_sem = grid[1, :] - grid[0, :]
+    ax.set_xlabel(f"Δ filter: raw {d_filter[0]:+.3f}, semantic {d_filter[1]:+.3f}\n"
+                  f"Δ semantic: no-filter {d_sem[0]:+.3f}, filter {d_sem[1]:+.3f}",
+                  fontsize=8.5)
+    save(fig, out, "condition_grid")
 
 
 def main():
@@ -250,20 +327,24 @@ def main():
     ap.add_argument("--out", default="results/figures")
     args = ap.parse_args()
 
+    os.makedirs(args.out, exist_ok=True)
+    print(f"[plot] {args.inp} -> {args.out}")
     header, rows = load_metrics(args.inp)
     system = header.get("system", "unknown")
     ks = header.get("ks") or []
     retrieval_k = header.get("retrieval_k") or 0
-    os.makedirs(args.out, exist_ok=True)
-    print(f"[plot] {args.inp} -> {args.out} "
-          f"({len(rows)} queries, {len(scorable(rows))} scorable, system={system})")
+    conds = conditions(header, rows)
+    print(f"  {len(rows)} queries, {len(comparable(rows, conds))} comparable, "
+          f"system={system}")
+    print(f"  conditions ({len(conds)}/{len(CANONICAL_ORDER)}): {', '.join(conds)}")
     if not retrieval_k:
         print("  [note] no retrieval_k in the header (pre-2026-08 metrics file); "
               "MRR caps cannot be checked against the run's retrieval depth")
 
-    plot_rank_distribution(rows, args.out, system)
-    plot_mrr_caps(rows, args.out, system, retrieval_k)
-    plot_recall_at_k(rows, args.out, system, ks)
+    plot_rank_distribution(rows, args.out, system, conds)
+    plot_mrr_caps(rows, args.out, system, retrieval_k, conds)
+    plot_recall_at_k(rows, args.out, system, ks, conds)
+    plot_condition_grid(rows, args.out, system, retrieval_k, conds)
     print("[done]")
 
 
