@@ -41,6 +41,7 @@ from typing import Sequence
 from .adapter import VectorDBAdapter
 from .encode import Encoder
 from .schema import CONDITIONS, Predicate, QueryItem, RawResult, RawResults
+from .version import HARNESS_CONTRACT, BenchmarkVersion  # noqa: F401  (annotation)
 
 DEFAULT_K = 1000
 DEFAULT_WARMUP = 1
@@ -86,7 +87,11 @@ class Runner:
         self.warmup = max(0, warmup)
         self.repeat = max(1, repeat)
 
-    def run(self, items: Sequence[QueryItem], k: int = DEFAULT_K) -> RawResults:
+    def run(self, items: Sequence[QueryItem], k: int = DEFAULT_K,
+            benchmark: "BenchmarkVersion | None" = None) -> RawResults:
+        """Run every condition for every item. `benchmark` is the version marker of
+        the query set being run, stamped into the results so they can later be shown
+        comparable (or not) — see frame/core/version.py."""
         results: list[RawResult] = []
         for item in items:
             ids: dict[str, list[str]] = {}
@@ -109,7 +114,8 @@ class Runner:
 
             results.append(RawResult(query_id=item.query_id, ids=ids,
                                      latency_ms=latency))
-        return RawResults(system=self.adapter.name, k=k, results=results)
+        return RawResults(system=self.adapter.name, k=k, results=results,
+                          benchmark=benchmark, harness_contract=HARNESS_CONTRACT)
 
     def _timed_search(
         self, vec, filters: Sequence[Predicate], k: int

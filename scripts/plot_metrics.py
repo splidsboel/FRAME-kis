@@ -65,7 +65,13 @@ mpl.rcParams.update({
 })
 
 
-def save(fig, out, name):
+def save(fig, out, name, stamp=None):
+    # Every figure carries the query-set version it came from: a plot in the report
+    # is a result, and a result that cannot be traced to its inputs cannot be
+    # compared with another (Omar, 27-07-2026).
+    if stamp:
+        fig.text(0.995, 0.005, stamp, ha="right", va="bottom",
+                 fontsize=5.5, color=MUTED)
     for ext in ("pdf", "png"):
         fig.savefig(os.path.join(out, f"{name}.{ext}"))
     plt.close(fig)
@@ -142,7 +148,7 @@ def _mrr(rows, cond, cap):
 
 # ─── 1. rank distribution ───────────────────────────────────────────────────
 
-def plot_rank_distribution(rows, out, system, conds):
+def plot_rank_distribution(rows, out, system, conds, stamp=None):
     rows = comparable(rows, conds)
     if not rows:
         print("  (no comparable items — skipping rank_distribution)")
@@ -193,12 +199,12 @@ def plot_rank_distribution(rows, out, system, conds):
     ax.set_title(f"Target-rank distribution by condition — {system}\n"
                  f"({len(rows)} items scorable in all {len(conds)} conditions)",
                  fontsize=10)
-    save(fig, out, "rank_distribution")
+    save(fig, out, "rank_distribution", stamp)
 
 
 # ─── 2. MRR at rank caps ────────────────────────────────────────────────────
 
-def plot_mrr_caps(rows, out, system, retrieval_k, conds):
+def plot_mrr_caps(rows, out, system, retrieval_k, conds, stamp=None):
     rows = comparable(rows, conds)
     if not rows:
         print("  (no comparable items — skipping mrr_caps)")
@@ -247,12 +253,12 @@ def plot_mrr_caps(rows, out, system, retrieval_k, conds):
     ax.legend(handles=handles, frameon=False, loc="upper right", fontsize=8,
               ncol=2 if len(handles) > 3 else 1)
     ax.set_title(f"MRR at rank caps — {system} ({len(rows)} comparable items)")
-    save(fig, out, "mrr_caps")
+    save(fig, out, "mrr_caps", stamp)
 
 
 # ─── 3. Recall@k ────────────────────────────────────────────────────────────
 
-def plot_recall_at_k(rows, out, system, ks, conds):
+def plot_recall_at_k(rows, out, system, ks, conds, stamp=None):
     rows = comparable(rows, conds)
     if not rows or not ks:
         print("  (no comparable items / no ks — skipping recall_at_k)")
@@ -276,12 +282,12 @@ def plot_recall_at_k(rows, out, system, ks, conds):
     ax.set_ylim(0, 1.02)
     ax.legend(frameon=False, loc="lower right", fontsize=8.5)
     ax.set_title(f"Geometric correctness — {system} ({len(rows)} comparable items)")
-    save(fig, out, "recall_at_k")
+    save(fig, out, "recall_at_k", stamp)
 
 
 # ─── 4. the 2x2 grid ────────────────────────────────────────────────────────
 
-def plot_condition_grid(rows, out, system, retrieval_k, conds):
+def plot_condition_grid(rows, out, system, retrieval_k, conds, stamp=None):
     """The matrix read as a matrix: filter delta down one axis, raw-vs-semantic
     across the other. Only drawn when all four cells ran — a partial matrix has no
     interpretable margins."""
@@ -318,7 +324,7 @@ def plot_condition_grid(rows, out, system, retrieval_k, conds):
     ax.set_xlabel(f"Δ filter: raw {d_filter[0]:+.3f}, semantic {d_filter[1]:+.3f}\n"
                   f"Δ semantic: no-filter {d_sem[0]:+.3f}, filter {d_sem[1]:+.3f}",
                   fontsize=8.5)
-    save(fig, out, "condition_grid")
+    save(fig, out, "condition_grid", stamp)
 
 
 def main():
@@ -337,14 +343,22 @@ def main():
     print(f"  {len(rows)} queries, {len(comparable(rows, conds))} comparable, "
           f"system={system}")
     print(f"  conditions ({len(conds)}/{len(CANONICAL_ORDER)}): {', '.join(conds)}")
+    bench = header.get("benchmark")
+    if bench:
+        stamp = f"{bench['corpus']}/{bench['version']}+{bench['digest']}"
+        print(f"  query set: {stamp}")
+    else:
+        stamp = None
+        print("  [note] no query-set version in this metrics file — figures cannot "
+              "be attributed to a query set version")
     if not retrieval_k:
         print("  [note] no retrieval_k in the header (pre-2026-08 metrics file); "
               "MRR caps cannot be checked against the run's retrieval depth")
 
-    plot_rank_distribution(rows, args.out, system, conds)
-    plot_mrr_caps(rows, args.out, system, retrieval_k, conds)
-    plot_recall_at_k(rows, args.out, system, ks, conds)
-    plot_condition_grid(rows, args.out, system, retrieval_k, conds)
+    plot_rank_distribution(rows, args.out, system, conds, stamp)
+    plot_mrr_caps(rows, args.out, system, retrieval_k, conds, stamp)
+    plot_recall_at_k(rows, args.out, system, ks, conds, stamp)
+    plot_condition_grid(rows, args.out, system, retrieval_k, conds, stamp)
     print("[done]")
 
 

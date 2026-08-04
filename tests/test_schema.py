@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from frame.core.version import HARNESS_CONTRACT
 from frame.core.schema import (
     BY_NAME,
     CONDITION_NAMES,
@@ -291,7 +292,8 @@ def test_metrics_write_jsonl(tmp_path):
     lines = p.read_text().splitlines()
     header = json.loads(lines[0])
     assert header == {"system": "s", "ks": [5, 25], "retrieval_k": 1000,
-                      "conditions": [FILT], "n_comparable": 1}
+                      "conditions": [FILT], "n_comparable": 1,
+                      "harness_contract": HARNESS_CONTRACT}
     row = json.loads(lines[1])
     assert row["query_id"] == "q1"
     assert row["rr"][FILT] == 0.5

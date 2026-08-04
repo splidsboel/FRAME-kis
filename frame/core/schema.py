@@ -16,7 +16,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, Iterator, Sequence
+
+from .version import HARNESS_CONTRACT
+
+if TYPE_CHECKING:      # only for the annotation; avoids a runtime import cycle
+    from .version import BenchmarkVersion
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,15 +180,49 @@ class QueryItem:
         )
 
 
-def load_query_set(path: str) -> list[QueryItem]:
-    """Load compiled + GT-enriched items from a benchmark.jsonl."""
+@dataclass
+class QuerySet:
+    """A benchmark.jsonl: its items plus the version marker identifying them.
+
+    `version` is None only for a file written before versioning existed — which is
+    itself a fact worth carrying, since results scored against it cannot be shown
+    comparable to anything.
+    """
+
+    items: list[QueryItem] = field(default_factory=list)
+    version: "BenchmarkVersion | None" = None
+
+    def __iter__(self) -> Iterator[QueryItem]:
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+
+def load_benchmark(path: str) -> QuerySet:
+    """Load a benchmark.jsonl with its version header (if it has one)."""
+    from .version import BenchmarkVersion
+
+    version = None
     items: list[QueryItem] = []
     with open(path) as f:
-        for line in f:
+        for i, line in enumerate(f):
             line = line.strip()
-            if line:
-                items.append(QueryItem.from_dict(json.loads(line)))
-    return items
+            if not line:
+                continue
+            d = json.loads(line)
+            # The header is the first line and has no query_id. Detecting it by
+            # content rather than by position keeps pre-versioning files loadable.
+            if i == 0 and "query_id" not in d:
+                version = BenchmarkVersion.from_dict(d)
+                continue
+            items.append(QueryItem.from_dict(d))
+    return QuerySet(items=items, version=version)
+
+
+def load_query_set(path: str) -> list[QueryItem]:
+    """Just the items. Use load_benchmark() when the version marker matters."""
+    return load_benchmark(path).items
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,22 +271,39 @@ class RawResults:
     system: str                        # adapter.name, e.g. "pgvector"
     k: int                             # retrieval depth of the run
     results: list[RawResult] = field(default_factory=list)
+    # What this run was measured against. Without these two a results file cannot
+    # be shown comparable to any other — see frame/core/version.py.
+    benchmark: "BenchmarkVersion | None" = None
+    # Defaults to the CURRENT contract because an in-memory RawResults was, by
+    # definition, just produced by this harness. Only a file can carry 0, and only
+    # when it was written before versioning existed — which is the case worth
+    # catching (see RawResults.read_jsonl).
+    harness_contract: int = HARNESS_CONTRACT
 
     def __iter__(self) -> Iterator[RawResult]:
         return iter(self.results)
 
     def write_jsonl(self, path: str) -> None:
+        header: dict = {"system": self.system, "k": self.k,
+                        "harness_contract": self.harness_contract}
+        if self.benchmark is not None:
+            header["benchmark"] = self.benchmark.to_dict()
         with open(path, "w") as f:
-            f.write(json.dumps({"system": self.system, "k": self.k}) + "\n")
+            f.write(json.dumps(header) + "\n")
             for r in self.results:
                 f.write(json.dumps(r.to_dict()) + "\n")
 
     @classmethod
     def read_jsonl(cls, path: str) -> "RawResults":
+        from .version import BenchmarkVersion
+
         with open(path) as f:
             header = json.loads(f.readline())
             rows = [RawResult.from_dict(json.loads(l)) for l in f if l.strip()]
-        return cls(system=header["system"], k=header["k"], results=rows)
+        bench = header.get("benchmark")
+        return cls(system=header["system"], k=header["k"], results=rows,
+                   benchmark=BenchmarkVersion.from_dict(bench) if bench else None,
+                   harness_contract=header.get("harness_contract", 0))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -295,6 +351,10 @@ class Metrics:
     # capped MRR can say whether its cap is meaningful: no rank beyond k exists,
     # so MRR@cap for cap >= k is just the uncapped MRR wearing a hat. 0 = unknown.
     retrieval_k: int = 0
+    # Provenance, carried through from the run so a metrics file alone says what it
+    # may be compared with (frame/core/version.py).
+    benchmark: "BenchmarkVersion | None" = None
+    harness_contract: int = HARNESS_CONTRACT
 
     def conditions(self) -> list[str]:
         """Conditions this run produced, in canonical order."""
@@ -357,14 +417,18 @@ class Metrics:
         return _percentile(self._latencies(cond), p)
 
     def write_jsonl(self, path: str) -> None:
+        header: dict = {
+            "system": self.system,
+            "ks": list(self.ks),
+            "retrieval_k": self.retrieval_k,
+            "conditions": self.conditions(),
+            "n_comparable": len(self.comparable()),
+            "harness_contract": self.harness_contract,
+        }
+        if self.benchmark is not None:
+            header["benchmark"] = self.benchmark.to_dict()
         with open(path, "w") as f:
-            f.write(json.dumps({
-                "system": self.system,
-                "ks": list(self.ks),
-                "retrieval_k": self.retrieval_k,
-                "conditions": self.conditions(),
-                "n_comparable": len(self.comparable()),
-            }) + "\n")
+            f.write(json.dumps(header) + "\n")
             for m in self.per_query:
                 f.write(json.dumps(m.to_dict()) + "\n")
 

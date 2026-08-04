@@ -14,10 +14,10 @@ from __future__ import annotations
 import argparse
 import os
 
-from frame import Analyzer, Runner, load_query_set
+from frame import Analyzer, Runner
 from frame.adapters import PgvectorAdapter
 from frame.core.encode import CachingEncoder, SiglipEncoder
-from frame.core.schema import PRIMARY_FILTERED
+from frame.core.schema import PRIMARY_FILTERED, load_benchmark
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
@@ -54,16 +54,19 @@ def explain_one(adapter, encoder, items, qid, k):
 PG_ITERATIVE_MODES = ("off", "relaxed_order", "strict_order")
 
 
-def run_and_score(system, encoder, items, k, warmup, repeat, adapter_kwargs, label):
+def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
+                  allow_mismatch=False):
     """One full run for one adapter configuration; writes tagged artifacts, returns Metrics."""
     adapter = ADAPTERS[system](**adapter_kwargs)
     with adapter:
-        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(items, k=k)
+        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(
+            qs.items, k=k, benchmark=qs.version)
 
     suffix = f".{label}" if label else ""
     raw_path = os.path.join(DATA, f"raw_results.{system}{suffix}.jsonl")
     raw.write_jsonl(raw_path)
-    metrics = Analyzer().analyze(raw, items)
+    metrics = Analyzer().analyze(raw, qs.items, benchmark=qs.version,
+                                 allow_mismatch=allow_mismatch)
     metrics_path = os.path.join(DATA, f"metrics.{system}{suffix}.jsonl")
     metrics.write_jsonl(metrics_path)
 
@@ -106,13 +109,24 @@ def main():
                     choices=[*PG_ITERATIVE_MODES, "sweep"],
                     help="pgvector HNSW iterative_scan mode; 'sweep' runs all three "
                          "and tags outputs per mode (pgvector only)")
+    ap.add_argument("--allow-mismatch", action="store_true",
+                    help="score even if the results were not produced against this "
+                         "query set / harness version (numbers will NOT be "
+                         "comparable — see frame/core/version.py)")
     ap.add_argument("--explain", metavar="QID",
                     help="diagnostic: EXPLAIN the filtered search for one query "
                          "under iterative_scan off vs relaxed_order, then exit")
     args = ap.parse_args()
 
-    items = load_query_set(args.bench)
+    qs = load_benchmark(args.bench)
+    items = qs.items
     print(f"loaded {len(items)} items from {os.path.relpath(args.bench, HERE)}")
+    if qs.version is None:
+        print("[WARN] this benchmark.jsonl has no version marker — rebuild it with "
+              "`uv run python queryset/build.py` so runs can be shown comparable")
+    else:
+        print(f"query set: {qs.version.label}  "
+              f"({qs.version.n_with_gt}/{qs.version.n_items} with GT)")
 
     encoder = CachingEncoder(SiglipEncoder())
 
@@ -136,8 +150,8 @@ def main():
         if len(modes) > 1:
             print(f"\n{'#'*60}\n# iterative_scan = {mode}\n{'#'*60}")
         results_by_mode[mode] = run_and_score(
-            args.system, encoder, items, args.k,
-            args.warmup, args.repeat, adapter_kwargs, label)
+            args.system, encoder, qs, args.k,
+            args.warmup, args.repeat, adapter_kwargs, label, args.allow_mismatch)
 
     if len(modes) > 1:
         print_sweep_comparison(results_by_mode, args.k)

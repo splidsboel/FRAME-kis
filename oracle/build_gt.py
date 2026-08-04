@@ -79,6 +79,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(HERE, "..", "data", "benchmark.jsonl")
 MODEL_NAME = "google/siglip-base-patch16-224"
 
+# Repo root on the path so `frame.core.version` imports when this runs as a script
+# from a SLURM job (same pattern as scripts/prep_*.py).
+sys.path.insert(0, os.path.dirname(HERE))
+
 # thresholds sampled for the selectivity-vs-t diagnostic curve
 CURVE_THRESHOLDS = [0.0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 
@@ -462,9 +466,15 @@ def main():
 
     if not os.path.exists(BENCH):
         sys.exit(f"{BENCH} not found — run build.py first")
-    items = [json.loads(l) for l in open(BENCH) if l.strip()]
+    rows = [json.loads(l) for l in open(BENCH) if l.strip()]
+    # First line is the version header (build.py writes it); keep it so it can be
+    # rewritten below with the GT parameters this run used.
+    header = rows[0] if rows and "query_id" not in rows[0] else None
+    items = rows[1:] if header else rows
     if args.limit:
         items = items[:args.limit]
+        print(f"[warn] --limit {args.limit}: writing a PARTIAL benchmark file; the "
+              f"version digest will reflect only these items")
 
     conn = connect()
     cur = conn.cursor()
@@ -557,7 +567,32 @@ def main():
             c["geometric_gt_raw_filtered"] = brute_knn(cur, emb_raw, args.k, filters, thresholds)
             c["target_rank_raw_filtered"] = target_rank(cur, emb_raw, tkfs, filters, thresholds)
 
+    # Refresh the version header: the GT just changed, and the parameters it was
+    # computed under are part of what makes two runs comparable. Recording them here
+    # means a later run against different thresholds or a different k is REFUSED by
+    # the Analyzer rather than silently compared. See frame/core/version.py.
+    if header is None:
+        print("[warn] no version header on benchmark.jsonl (built before versioning) "
+              "— re-run queryset/build.py to add one")
+    else:
+        from frame.core.version import BenchmarkVersion
+
+        gt_params = {
+            "oracle_k": args.k,
+            "scene_threshold": args.scene_threshold,
+            "object_threshold": args.object_threshold,
+            "encoder": MODEL_NAME,
+        }
+        version = BenchmarkVersion.compute(
+            version=header["version"], corpus=header["corpus"],
+            items=items, gt_params=gt_params)
+        header = version.to_dict()
+        print(f"[version] {version.label}  "
+              f"({version.n_with_gt}/{version.n_items} with GT)")
+
     with open(BENCH, "w") as f:
+        if header is not None:
+            f.write(json.dumps(header) + "\n")
         for it in items:
             f.write(json.dumps(it) + "\n")
     print(f"[done] wrote enriched GT to {os.path.relpath(BENCH, HERE)}")

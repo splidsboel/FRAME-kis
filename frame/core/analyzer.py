@@ -42,6 +42,52 @@ from .schema import (
     RawResult,
     RawResults,
 )
+from .version import HARNESS_CONTRACT, BenchmarkVersion, Compatibility, compare
+
+
+class VersionMismatch(RuntimeError):
+    """Results cannot be scored against this query set / harness."""
+
+
+def check_compatible(raw: RawResults, benchmark: BenchmarkVersion | None,
+                     allow_mismatch: bool = False) -> Compatibility | None:
+    """Raise unless `raw` may be scored against `benchmark` under this harness.
+
+    Returns the Compatibility so the caller can act on an `additive` result. Returns
+    None when there is nothing to check (no marker on either side and nothing to
+    compare against), which only happens in unit tests and ad-hoc scoring.
+    """
+    problems: list[str] = []
+
+    if raw.harness_contract != HARNESS_CONTRACT:
+        known = raw.harness_contract or "unknown (predates versioning)"
+        problems.append(
+            f"harness contract {known}, but this harness is {HARNESS_CONTRACT} — "
+            f"what a results file means has changed (conditions and/or metric "
+            f"definitions), so the numbers are not comparable")
+
+    compat: Compatibility | None = None
+    if benchmark is not None or raw.benchmark is not None:
+        compat = compare(raw.benchmark, benchmark)
+        if not compat.ok:
+            problems.append(f"query set: {compat.reason}")
+
+    if problems:
+        detail = "\n  - ".join(problems)
+        if not allow_mismatch:
+            raise VersionMismatch(
+                f"refusing to score these results:\n  - {detail}\n"
+                f"Re-run the benchmark against the current query set, or pass "
+                f"--allow-mismatch / allow_mismatch=True to score anyway (the "
+                f"numbers will not be comparable).")
+        print(f"[WARN] scoring despite a version mismatch:\n  - {detail}")
+    elif compat is not None:
+        if compat.status == "additive":
+            print(f"[note] query set moved since the run: {compat.reason}")
+        elif compat.reason:
+            print(f"[note] {compat.reason}")
+
+    return compat
 
 DEFAULT_KS = (5, 25, 50, 100, 1000)
 
@@ -57,14 +103,31 @@ class Analyzer:
         self.ks = tuple(ks)
         self.mrr_caps = tuple(mrr_caps)
 
-    def analyze(self, raw: RawResults, items: Sequence[QueryItem]) -> Metrics:
+    def analyze(self, raw: RawResults, items: Sequence[QueryItem],
+                benchmark: "BenchmarkVersion | None" = None,
+                allow_mismatch: bool = False) -> Metrics:
+        """Score `raw` against `items`.
+
+        Refuses by default when the results were not produced against this query set
+        (or by this harness) — a silently wrong comparison is the expensive failure
+        mode, an error message is the cheap one. `allow_mismatch=True` downgrades the
+        refusal to a printed warning.
+        """
+        compat = check_compatible(raw, benchmark, allow_mismatch=allow_mismatch)
+
         gt_by_id = {it.query_id: it.ground_truth for it in items}
-        per_query = [
-            self._score_one(r, gt_by_id.get(r.query_id))
-            for r in raw.results
-        ]
+        results = raw.results
+        if compat is not None and compat.status == "additive":
+            # Every shared item is unchanged, so those remain valid; the rest are
+            # dropped rather than scored against a query set that lacks them.
+            shared = set(compat.shared)
+            results = [r for r in results if r.query_id in shared]
+
+        per_query = [self._score_one(r, gt_by_id.get(r.query_id)) for r in results]
         return Metrics(system=raw.system, ks=self.ks, per_query=per_query,
-                       retrieval_k=raw.k)
+                       retrieval_k=raw.k,
+                       benchmark=benchmark if benchmark is not None else raw.benchmark,
+                       harness_contract=HARNESS_CONTRACT)
 
     def _score_one(self, r: RawResult, gt: GroundTruth | None) -> QueryMetrics:
         targets = set(gt.target_keyframe_ids or []) if gt else set()

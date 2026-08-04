@@ -108,10 +108,50 @@ def test_main_compiles_items(tmp_path, authored_item, monkeypatch):
     assert exc.value.code == 0  # no bad items
 
     lines = out.read_text().splitlines()
-    assert len(lines) == 1
-    compiled = json.loads(lines[0])
+    assert len(lines) == 2                     # version header + one item
+    header = json.loads(lines[0])
+    assert header["corpus"] and header["digest"]
+    assert header["n_items"] == 1
+    assert header["n_with_gt"] == 0            # nothing enriched yet
+    assert "q0001" in header["items"]
+    compiled = json.loads(lines[1])
     assert compiled["query_id"] == "q0001"
     assert "computed" in compiled  # stub injected
+
+
+def test_main_carries_ground_truth_forward(tmp_path, authored_item, enriched_item,
+                                           monkeypatch):
+    """GT costs an HPC job. A rebuild must not discard it for queries that did not
+    change — and must discard it for one that did."""
+    import json
+
+    qdir = tmp_path / "queries"
+    qdir.mkdir()
+    (qdir / "q0001.json").write_text(json.dumps(authored_item))
+    out = tmp_path / "data" / "benchmark.jsonl"
+    out.parent.mkdir(parents=True)
+    # a previous build, already enriched by the oracle
+    out.write_text(json.dumps({"version": "1.0.0", "corpus": "v3c1", "digest": "x",
+                               "items": {}, "gt_params": {}}) + "\n"
+                   + json.dumps(enriched_item) + "\n")
+
+    monkeypatch.setattr(build, "QDIR", str(qdir))
+    monkeypatch.setattr(build, "OUT", str(out))
+    with pytest.raises(SystemExit):
+        build.main()
+
+    rebuilt = json.loads(out.read_text().splitlines()[1])
+    assert rebuilt["computed"]["geometric_gt_filtered"] == \
+        enriched_item["computed"]["geometric_gt_filtered"]
+
+    # now edit the query itself — its GT is no longer valid and must be dropped
+    edited = copy.deepcopy(authored_item)
+    edited["decomposition"]["vector_query"] = "something else entirely"
+    (qdir / "q0001.json").write_text(json.dumps(edited))
+    with pytest.raises(SystemExit):
+        build.main()
+    assert json.loads(out.read_text().splitlines()[1])["computed"][
+        "geometric_gt_filtered"] is None
 
 
 def test_main_rejects_invalid_item_nonzero_exit(tmp_path, authored_item, monkeypatch):

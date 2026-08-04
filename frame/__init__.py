@@ -11,6 +11,7 @@ from .core.dataset import Dataset
 from .core.profile import Profiler, SelectivityProfile
 from .core.runner import Runner
 from .core.sweep import Sweeper, SweepCell
+from .core.version import HARNESS_CONTRACT, BenchmarkVersion, Compatibility
 from .core.schema import (
     CONDITION_NAMES,
     CONDITIONS,
@@ -19,8 +20,10 @@ from .core.schema import (
     Metrics,
     Predicate,
     QueryItem,
+    QuerySet,
     RawResult,
     RawResults,
+    load_benchmark,
     load_query_set,
 )
 
@@ -42,5 +45,10 @@ __all__ = [
     "RawResult",
     "RawResults",
     "Metrics",
+    "load_benchmark",
     "load_query_set",
+    "QuerySet",
+    "BenchmarkVersion",
+    "Compatibility",
+    "HARNESS_CONTRACT",
 ]

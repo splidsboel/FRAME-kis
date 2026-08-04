@@ -158,6 +158,39 @@ root (e.g. `sbatch build_gt.sh …`, `sbatch scripts/author_probe.sh …`).
   the filter cells are not — averaging each over its own subset would compare
   different query sets and read the difference as a condition effect.
 - Adapters return **ranked ids only** — sufficient for Recall@k and MRR.
+- **Every run records what it was measured against.** Two markers travel in each
+  results file: the **benchmark version** (`v3c1/1.0.0+d9ac09a6e5c6` — the query set
+  *and* its ground truth, which live in one file) and the **harness contract** (what
+  a results file means). The Analyzer **refuses** to score results that were not
+  produced against the current query set and harness; `--allow-mismatch` overrides.
+  See `frame/core/version.py`.
+
+## Query-set versioning
+
+`queryset/queryset.json` holds the hand-set semver; bump it when you change the
+query set:
+
+| bump | when | effect on existing results |
+|---|---|---|
+| MAJOR | a query's meaning changed, items removed, or GT recomputed under different parameters | void |
+| MINOR | items added, nothing else | still valid — scoring restricts to the shared items |
+| PATCH | nothing result-affecting (notes, `status`, `verified` flags) | unaffected |
+
+`queryset/build.py` also computes a **digest** of the result-affecting contents and
+warns if they changed while the semver did not — a hand-set version gets forgotten
+eventually, so the digest is what is actually enforced. Provenance fields (`notes`,
+`source`, `status`, a filter's `vocab`/`verified`) are deliberately outside the
+digest: fixing a typo in a note must not invalidate a finished run.
+
+Because the digest separates the authored half from the ground-truth half, a
+rebuild **carries GT forward** for every query that did not change, and drops it
+only for those that did (re-run `oracle/build_gt.py` for those).
+
+```bash
+uv run python queryset/build.py            # -> v3c1/1.0.0+d9ac09a6e5c6
+sbatch build_gt.sh                          # fills GT, records its parameters
+uv run python run_benchmark.py --system pgvector
+```
 
 ## Tests
 

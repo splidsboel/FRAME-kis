@@ -4,8 +4,16 @@ from __future__ import annotations
 
 import copy
 
-from frame.core.analyzer import Analyzer, _first_rank, _recall_at_k
+import pytest
+
+from frame.core.analyzer import (
+    Analyzer,
+    VersionMismatch,
+    _first_rank,
+    _recall_at_k,
+)
 from frame.core.schema import CONDITION_NAMES, QueryItem, RawResult, RawResults
+from frame.core.version import HARNESS_CONTRACT, BenchmarkVersion
 
 FILT, NOFILT = "semantic+filter", "raw+nofilter"
 RAW_FILT, SEM_NOFILT = "raw+filter", "semantic+nofilter"
@@ -210,3 +218,106 @@ def test_summary_flags_caps_beyond_retrieval_depth(enriched_item):
     raw = RawResults(system="pgvector", k=100, results=[_full("q0001", ["kf_target"])])
     text = Analyzer(ks=(5,)).summary(Analyzer(ks=(5,)).analyze(raw, [item]))
     assert "at or beyond the run's retrieval depth k=100" in text
+
+
+# ─── version enforcement ────────────────────────────────────────────────────
+
+def _versioned_raw(item_dict, benchmark, contract=HARNESS_CONTRACT):
+    return RawResults(system="pgvector", k=1000,
+                      results=[_full(item_dict["query_id"], ["kf_target"])],
+                      benchmark=benchmark, harness_contract=contract)
+
+
+def _bv(items, **kw):
+    return BenchmarkVersion.compute(kw.get("version", "1.0.0"),
+                                    kw.get("corpus", "v3c1"), items,
+                                    kw.get("gt_params", {}))
+
+
+def test_analyze_accepts_a_matching_version(enriched_item):
+    bv = _bv([enriched_item])
+    item = QueryItem.from_dict(enriched_item)
+    m = Analyzer(ks=(5,)).analyze(_versioned_raw(enriched_item, bv), [item], benchmark=bv)
+    assert len(m.per_query) == 1
+    assert m.benchmark == bv
+    assert m.harness_contract == HARNESS_CONTRACT
+
+
+def test_analyze_refuses_an_edited_query_set(enriched_item):
+    ran_against = _bv([enriched_item])
+    edited = copy.deepcopy(enriched_item)
+    edited["raw_query_text"] = "a completely different query"
+    now = _bv([edited])
+
+    item = QueryItem.from_dict(edited)
+    raw = _versioned_raw(enriched_item, ran_against)
+    with pytest.raises(VersionMismatch, match="q0001"):
+        Analyzer(ks=(5,)).analyze(raw, [item], benchmark=now)
+
+
+def test_allow_mismatch_downgrades_to_a_warning(enriched_item, capsys):
+    ran_against = _bv([enriched_item])
+    edited = copy.deepcopy(enriched_item)
+    edited["raw_query_text"] = "different"
+    now = _bv([edited])
+
+    m = Analyzer(ks=(5,)).analyze(_versioned_raw(enriched_item, ran_against),
+                                  [QueryItem.from_dict(edited)], benchmark=now,
+                                  allow_mismatch=True)
+    assert len(m.per_query) == 1
+    assert "version mismatch" in capsys.readouterr().out
+
+
+def test_analyze_refuses_an_older_harness_contract(enriched_item):
+    bv = _bv([enriched_item])
+    raw = _versioned_raw(enriched_item, bv, contract=HARNESS_CONTRACT - 1)
+    with pytest.raises(VersionMismatch, match="harness contract"):
+        Analyzer(ks=(5,)).analyze(raw, [QueryItem.from_dict(enriched_item)], benchmark=bv)
+
+
+def test_analyze_refuses_an_unversioned_results_file(enriched_item):
+    """Exactly the case that bit us: a results file from before versioning, whose
+    inputs are unknown."""
+    bv = _bv([enriched_item])
+    raw = RawResults(system="pgvector", k=1000,
+                     results=[_full("q0001", ["kf_target"])])   # no markers
+    with pytest.raises(VersionMismatch, match="predates versioning"):
+        Analyzer(ks=(5,)).analyze(raw, [QueryItem.from_dict(enriched_item)], benchmark=bv)
+
+
+def test_added_queries_score_on_the_shared_subset(enriched_item):
+    """A MINOR bump must keep the old run usable for the queries that did not move."""
+    ran_against = _bv([enriched_item])
+    extra = copy.deepcopy(enriched_item)
+    extra["query_id"] = "q0002"
+    now = _bv([enriched_item, extra])
+
+    items = [QueryItem.from_dict(enriched_item), QueryItem.from_dict(extra)]
+    raw = RawResults(system="pgvector", k=1000,
+                     results=[_full("q0001", ["kf_target"])],
+                     benchmark=ran_against, harness_contract=HARNESS_CONTRACT)
+    m = Analyzer(ks=(5,)).analyze(raw, items, benchmark=now)   # no raise
+    assert [q.query_id for q in m.per_query] == ["q0001"]
+
+
+def test_removed_queries_are_dropped_not_scored_as_misses(enriched_item):
+    ran_against_both = _bv([enriched_item, {**copy.deepcopy(enriched_item),
+                                            "query_id": "q0002"}])
+    now = _bv([enriched_item])
+    raw = RawResults(system="pgvector", k=1000,
+                     results=[_full("q0001", ["kf_target"]),
+                              _full("q0002", ["kf_target"])],
+                     benchmark=ran_against_both, harness_contract=HARNESS_CONTRACT)
+    m = Analyzer(ks=(5,)).analyze(raw, [QueryItem.from_dict(enriched_item)],
+                                  benchmark=now)
+    # q0002 no longer exists; scoring it would report a fabricated unscorable row
+    assert [q.query_id for q in m.per_query] == ["q0001"]
+
+
+def test_no_markers_anywhere_is_allowed(enriched_item):
+    """Ad-hoc scoring in tests/notebooks, where there is nothing to compare."""
+    m = Analyzer(ks=(5,)).analyze(
+        RawResults(system="fake", k=5, results=[_full("q0001", ["kf_target"])],
+                   harness_contract=HARNESS_CONTRACT),
+        [QueryItem.from_dict(enriched_item)])
+    assert len(m.per_query) == 1

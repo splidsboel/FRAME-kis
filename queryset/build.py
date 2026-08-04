@@ -17,9 +17,14 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from frame.core.version import BenchmarkVersion, query_digest  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 QDIR = os.path.join(HERE, "queries")
 OUT = os.path.join(HERE, "..", "data", "benchmark.jsonl")
+IDENTITY = os.path.join(HERE, "queryset.json")
 
 REQUIRED = ["query_id", "status", "source", "raw_query_text", "decomposition", "target"]
 
@@ -91,18 +96,100 @@ def main():
             bad += 1
             continue
         seen.add(qid)
-        item.setdefault("computed", computed_stub(item))
         items.append(item)
+
+    # Carry ground truth forward. GT costs an HPC job, and it stays valid exactly
+    # when the query it was computed for is unchanged — which is what the query
+    # digest tells us. An edited query correctly loses its GT (re-run the oracle);
+    # everything else survives a rebuild untouched.
+    prior = read_items(OUT)
+    carried = dropped = 0
+    for item in items:
+        old = prior.get(item["query_id"])
+        if old and old.get("computed") and query_digest(old) == query_digest(item):
+            item["computed"] = old["computed"]
+            carried += 1
+        else:
+            if old and old.get("computed") and _has_gt(old):
+                dropped += 1
+            item["computed"] = computed_stub(item)
+
+    identity = json.load(open(IDENTITY))
+    # GT is stubbed here and filled later by the oracle, which rewrites this header
+    # with the real gt_params. Carry forward whatever the previous build recorded so
+    # a rebuild of unchanged queries does not look like a GT parameter change.
+    previous = read_header(OUT)
+    gt_params = previous.gt_params if previous else {}
+    version = BenchmarkVersion.compute(
+        version=identity["version"], corpus=identity["corpus"],
+        items=items, gt_params=gt_params)
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
+        f.write(json.dumps(version.to_dict()) + "\n")
         for it in items:
             f.write(json.dumps(it) + "\n")
 
     n_verified = sum(1 for it in items if it["status"] == "verified")
     print(f"[done] {len(items)} items -> {os.path.relpath(OUT, os.path.join(HERE, '..'))}  "
           f"({n_verified} verified, {len(items) - n_verified} draft, {bad} rejected)")
+    print(f"[version] {version.label}  ({version.n_with_gt}/{version.n_items} with GT)")
+    if carried or dropped:
+        print(f"[gt] carried forward for {carried} unchanged item(s)"
+              + (f"; DROPPED for {dropped} edited item(s) — re-run oracle/build_gt.py"
+                 if dropped else ""))
+    if version.n_with_gt and not version.gt_params:
+        print("[note] ground truth present but its parameters (oracle k, thresholds, "
+              "encoder) are unrecorded — it predates versioning. The next "
+              "oracle/build_gt.py run will record them.")
+
+    # The drift catcher: a hand-set semver WILL be forgotten eventually, so say so
+    # loudly rather than let two different query sets share one version number.
+    if previous and previous.digest != version.digest \
+            and previous.version == version.version:
+        from frame.core.version import compare
+        c = compare(previous, version)
+        print(f"\n[WARN] contents changed but the version is still "
+              f"{version.version} — bump 'version' in queryset/queryset.json")
+        print(f"[WARN] what changed: {c.reason or 'ground truth / parameters'}")
+        print(f"[WARN] guidance: {'MINOR' if c.status == 'additive' else 'MAJOR'} "
+              f"(see queryset.json '_bumping')")
+
     sys.exit(1 if bad else 0)
+
+
+def read_header(path):
+    """The BenchmarkVersion on an existing benchmark.jsonl, or None."""
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        first = f.readline().strip()
+    if not first:
+        return None
+    d = json.loads(first)
+    return None if "query_id" in d else BenchmarkVersion.from_dict(d)
+
+
+def read_items(path):
+    """{query_id: item} from an existing benchmark.jsonl (header skipped)."""
+    if not os.path.exists(path):
+        return {}
+    out = {}
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            d = json.loads(line)
+            if "query_id" in d:
+                out[d["query_id"]] = d
+    return out
+
+
+def _has_gt(item):
+    c = item.get("computed") or {}
+    return any(c.get(k) is not None for k in
+               ("target_keyframe_ids", "geometric_gt_filtered", "geometric_gt_nofilter"))
 
 
 if __name__ == "__main__":
