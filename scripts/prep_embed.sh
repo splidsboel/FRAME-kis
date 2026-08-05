@@ -3,15 +3,24 @@
 #SBATCH --partition=acltr
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
+#SBATCH --mem=48G
 #SBATCH --time=08:00:00
 #SBATCH --array=0-7
+#SBATCH --exclude=cn12
 #SBATCH --output=logs/frame_embed_%A_%a.out
 
 # --time was 1-00:00:00: tasks 6+7 of job 100871 hung on cn12 and burned the full
 # 24h without writing a single log line. A full 1220-video task takes ~3.5h, so 8h
 # is ample headroom and a hang now fails fast. The pass is resumable, so a
 # wall-clock kill only ever costs the video in flight.
+
+# --exclude=cn12: the hang above was not a one-off — BOTH tasks that landed on
+# cn12 (rtx8000) hung, and no other node has ever done so. The other passes run
+# on cn12 fine, so this is specific to this pass; drop the exclude if the cause
+# is ever found. Costs 2 of the partition's 32 GPUs.
+
+# --mem was 32G: task 1 of job 100871 died OUT_OF_MEMORY at that limit while its
+# siblings on the same node survived, i.e. 32G was marginal rather than wrong.
 
 # SigLIP image embeddings for an extracted V3C shard -> per-video npz staging.
 # GPU array (one shard of videos per task); no postgres. Resumable — re-submit

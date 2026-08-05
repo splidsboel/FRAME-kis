@@ -5,8 +5,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=2-00:00:00
-#SBATCH --array=0-7
+#SBATCH --array=0-15
 #SBATCH --output=logs/frame_detect_%A_%a.out
+
+# --array was 0-7: at 8-way this pass took 12h41-17h31 per task on V3C2 and was
+# ~60% of the whole pipeline's wall clock, with every other pass idle waiting on
+# it. 16-way halves it to ~7-9h. Widening is only safe on a dataset with NO
+# existing staging (see the NUM_SHARDS note below) — V3C3 is fresh.
 
 # OWLv2 object detection for an extracted V3C shard -> per-video parquet staging.
 # GPU array; no postgres. Uses ~/object_vocab.txt (same vocab as V3C1). Resumable.
@@ -18,10 +23,15 @@ set -euo pipefail
 PROJECT_DIR="${SLURM_SUBMIT_DIR:-$(pwd)}"
 SHARD_ROOT="${1:-$HOME/datasets/V3C/V3C2}"
 DATASET="${2:-v3c2}"
-# Fixed at 8 to match `#SBATCH --array=0-7` — deliberately NOT SLURM_ARRAY_TASK_COUNT.
-# Resubmitting a subset after a failure (e.g. --array=1,6,7) sets that to 3, which
-# would silently re-map every video to a different shard and corrupt the staging.
-NUM_SHARDS="${NUM_SHARDS:-8}"
+# Fixed at 16 to match `#SBATCH --array=0-15` — deliberately NOT SLURM_ARRAY_TASK_COUNT.
+# video_dirs() assigns videos round-robin (`i % num_shards == shard`), so the
+# INVARIANT is that the submitted array covers every index 0..NUM_SHARDS-1; then
+# each video is owned by exactly one task. Resubmitting a subset after a failure
+# (e.g. --array=1,6,7) sets SLURM_ARRAY_TASK_COUNT to 3, which would silently
+# re-map every video to a different shard and leave most of them unprocessed —
+# which is why this is a literal. Changing the width is safe only when you change
+# BOTH lines together and submit the full array.
+NUM_SHARDS="${NUM_SHARDS:-16}"
 
 [ -f "$HOME/object_vocab.txt" ] || { echo "missing ~/object_vocab.txt (object vocab)"; exit 1; }
 
