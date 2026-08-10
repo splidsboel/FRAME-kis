@@ -14,6 +14,8 @@ Reads the report data_stats.py writes and emits figures (PDF + PNG each), light-
                            #object instances/kf (Omar's "max 8 objects, 2-3 scenes")
   4. confidence_dist     — scene & object detection confidence histograms + threshold
   5. cooccurrence        — scene x object co-occurrence selectivity heatmap
+  6. cooccurrence_scene  — scene x scene co-occurrence heatmap (symmetric)
+  7. cooccurrence_object — object x object co-occurrence heatmap (symmetric)
 """
 
 from __future__ import annotations
@@ -117,6 +119,29 @@ def plot_confidence(rep, out):
     save(fig, out, "confidence_dist")
 
 
+def _draw_cooccurrence(M, xlabels, ylabels, xtitle, ytitle, title, out, name):
+    """Shared renderer for a co-occurrence heatmap: log-scaled viridis, zeros
+    masked to off-white. `M[y, x]` is the co-occurring-keyframe count."""
+    fig, ax = plt.subplots(figsize=(max(6, len(xlabels) * 0.32),
+                                    max(5, len(ylabels) * 0.30)))
+    masked = np.ma.masked_where(M == 0, M)
+    cmap = plt.get_cmap("viridis").copy()
+    cmap.set_bad(color="#f2f1ea")
+    im = ax.imshow(masked, aspect="auto", cmap=cmap,
+                   norm=LogNorm(vmin=max(masked.min(), 1), vmax=masked.max()))
+    ax.set_xticks(np.arange(len(xlabels)))
+    ax.set_xticklabels(xlabels, rotation=90, fontsize=6)
+    ax.set_yticks(np.arange(len(ylabels)))
+    ax.set_yticklabels(ylabels, fontsize=6)
+    ax.set_xlabel(xtitle)
+    ax.set_ylabel(ytitle)
+    ax.set_title(title)
+    ax.grid(False)
+    fig.colorbar(im, ax=ax, label="co-occurring keyframes (log)", shrink=0.7)
+    fig.tight_layout()
+    save(fig, out, name)
+
+
 def plot_cooccurrence(rep, out):
     co = rep.get("cooccurrence")
     if not co:
@@ -127,25 +152,32 @@ def plot_cooccurrence(rep, out):
     M = np.zeros((len(scenes), len(objects)))
     for p in co["pairs"]:
         M[si[p["scene"]], oi[p["object"]]] = p["kf"]
-    fig, ax = plt.subplots(figsize=(max(6, len(objects) * 0.32),
-                                     max(5, len(scenes) * 0.30)))
-    masked = np.ma.masked_where(M == 0, M)
-    cmap = plt.get_cmap("viridis").copy()
-    cmap.set_bad(color="#f2f1ea")
-    im = ax.imshow(masked, aspect="auto", cmap=cmap,
-                   norm=LogNorm(vmin=max(masked.min(), 1), vmax=masked.max()))
-    ax.set_xticks(np.arange(len(objects)))
-    ax.set_xticklabels(objects, rotation=90, fontsize=6)
-    ax.set_yticks(np.arange(len(scenes)))
-    ax.set_yticklabels(scenes, fontsize=6)
-    ax.set_xlabel("object label")
-    ax.set_ylabel("scene label")
-    ax.set_title(f"scene x object co-occurrence (keyframes, pinned) — "
-                 f"{co['n_present']}/{co['n_possible']} pairs exist")
-    ax.grid(False)
-    fig.colorbar(im, ax=ax, label="co-occurring keyframes (log)", shrink=0.7)
-    fig.tight_layout()
-    save(fig, out, "cooccurrence")
+    _draw_cooccurrence(
+        M, objects, scenes, "object label", "scene label",
+        f"scene x object co-occurrence (keyframes, pinned) — "
+        f"{co['n_present']}/{co['n_possible']} pairs exist",
+        out, "cooccurrence")
+
+
+def plot_cooccurrence_within(rep, out):
+    """scene x scene and object x object heatmaps. The stored pairs are the upper
+    triangle (l1 < l2); mirror to a full symmetric square and mask the diagonal
+    (a label with itself is just its marginal, and would blow out the log scale)."""
+    for kind, axis_label in (("scene", "scene label"), ("object", "object label")):
+        cw = rep.get(f"cooccurrence_{kind}")
+        if not cw:
+            continue
+        labels = cw["labels"]
+        idx = {l: i for i, l in enumerate(labels)}
+        M = np.zeros((len(labels), len(labels)))
+        for p in cw["pairs"]:
+            i, j = idx[p["l1"]], idx[p["l2"]]
+            M[i, j] = M[j, i] = p["kf"]  # symmetric; diagonal stays 0 -> masked
+        _draw_cooccurrence(
+            M, labels, labels, axis_label, axis_label,
+            f"{kind} x {kind} co-occurrence (keyframes, pinned) — "
+            f"{cw['n_present']}/{cw['n_possible']} pairs exist",
+            out, f"cooccurrence_{kind}")
 
 
 def main():
@@ -161,6 +193,7 @@ def main():
     plot_labels_per_keyframe(rep, args.out)
     plot_confidence(rep, args.out)
     plot_cooccurrence(rep, args.out)
+    plot_cooccurrence_within(rep, args.out)
     print("[done]")
 
 

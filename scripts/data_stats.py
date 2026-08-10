@@ -215,6 +215,39 @@ def cooccurrence(cur, scene_labels, object_labels, total):
     }
 
 
+# ── block 5b: within-kind co-occurrence (scene x scene, object x object) ──
+def cooccur_within(cur, kind, labels, total):
+    """Keyframe co-occurrence for every *unordered* pair of distinct labels of one
+    kind (self-join on one table, pinned). `a.label < b.label` gives the upper
+    triangle only — the matrix is symmetric and the diagonal (a label with itself)
+    is just that label's own marginal, already in the per-label distribution."""
+    table, thresh = TABLE[kind], THRESH[kind]
+    cur.execute(
+        f"SELECT a.label AS l1, b.label AS l2, count(*) AS kf FROM "
+        f"(SELECT DISTINCT keyframe_id, label FROM {table} "
+        f"  WHERE label = ANY(%s) AND confidence >= %s) a "
+        f"JOIN "
+        f"(SELECT DISTINCT keyframe_id, label FROM {table} "
+        f"  WHERE label = ANY(%s) AND confidence >= %s) b "
+        f"USING (keyframe_id) "
+        f"WHERE a.label < b.label "
+        f"GROUP BY a.label, b.label ORDER BY kf DESC",
+        (labels, thresh, labels, thresh),
+    )
+    pairs = [
+        {"l1": l1, "l2": l2, "kf": kf, "selectivity": kf / total if total else None}
+        for l1, l2, kf in cur.fetchall()
+    ]
+    n_possible = len(labels) * (len(labels) - 1) // 2  # unordered pairs, no diagonal
+    return {
+        "labels": labels,
+        "pairs": pairs,
+        "n_present": len(pairs),
+        "n_possible": n_possible,
+        "n_empty": n_possible - len(pairs),
+    }
+
+
 # ── block 6: video-level metadata ──
 def video_metadata(cur):
     rep = {}
@@ -315,6 +348,16 @@ def main():
               co["pairs"], ["scene", "object", "kf", "selectivity"])
     print(f"[cooc] {len(scene_set)}x{len(object_set)} label grid: "
           f"{co['n_present']}/{co['n_possible']} pairs co-occur, {co['n_empty']} empty")
+
+    # block 5b — within-kind co-occurrence (scene x scene, object x object), same
+    # label sets as block 5. Symmetric, so only the upper triangle is stored.
+    for kind, label_set in (("scene", scene_set), ("object", object_set)):
+        cw = cooccur_within(cur, kind, label_set, total)
+        report[f"cooccurrence_{kind}"] = cw
+        write_csv(os.path.join(DATA, f"data_stats.cooccurrence.{kind}.csv"),
+                  cw["pairs"], ["l1", "l2", "kf", "selectivity"])
+        print(f"[cooc] {kind}x{kind} {len(label_set)} labels: "
+              f"{cw['n_present']}/{cw['n_possible']} pairs co-occur, {cw['n_empty']} empty")
 
     # block 6 — video-level metadata (Omar's "extra metadata to filter on"). Free
     # text, so guard it: a stray undecodable byte must never sink the core report.
