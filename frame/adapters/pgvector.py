@@ -311,9 +311,13 @@ class PgvectorAdapter(VectorDBAdapter):
               f"{len(datasets)} shards -> {total_kf:,} keyframes", flush=True)
         self._drop_indexes()
         with self._conn.cursor() as cur:
-            for table in ("keyframes",) + tuple(_COPY_COLUMNS):
-                if _table_exists(cur, table):
-                    cur.execute(f"TRUNCATE {table};")
+            # One TRUNCATE for all tables at once: truncating them separately fails
+            # on FK constraints (e.g. shots references videos), and CASCADE keeps it
+            # robust to FK edges not spelled out here. All targets are emptied anyway.
+            targets = [t for t in ("keyframes",) + tuple(_COPY_COLUMNS)
+                       if _table_exists(cur, t)]
+            if targets:
+                cur.execute(f"TRUNCATE {', '.join(targets)} CASCADE;")
 
         od_counter = [0]   # global object_detections id, unique across shards
         for ds in datasets:
