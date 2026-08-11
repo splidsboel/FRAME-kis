@@ -123,6 +123,37 @@ def test_is_scorable_false_when_target_passes_is_none(enriched_item):
     assert GroundTruth.from_item(enriched_item).is_scorable is False
 
 
+# ─── harm-exemplar + selectivity subdivision (GroundTruth) ───────────────────
+
+def test_is_harm_exemplar_only_when_target_fails_a_real_filter(enriched_item):
+    # target passes its filter -> not a harm exemplar
+    assert GroundTruth.from_item(enriched_item).is_harm_exemplar is False
+    # target fails its own filter -> harm exemplar
+    enriched_item["computed"]["target_passes_filter"] = False
+    assert GroundTruth.from_item(enriched_item).is_harm_exemplar is True
+
+
+def test_is_harm_exemplar_false_for_no_filter_item(enriched_item):
+    # a no-filter item has target_passes_filter None, which is NOT a harm exemplar
+    enriched_item["computed"]["target_passes_filter"] = None
+    assert GroundTruth.from_item(enriched_item).is_harm_exemplar is False
+
+
+def test_selectivity_class_boundary(enriched_item):
+    from frame.core.schema import SELECTIVE_MAX
+    c = enriched_item["computed"]
+    c["filter_selectivity_conjunction"] = SELECTIVE_MAX - 1e-6
+    assert GroundTruth.from_item(enriched_item).selectivity_class() == "selective"
+    c["filter_selectivity_conjunction"] = SELECTIVE_MAX
+    assert GroundTruth.from_item(enriched_item).selectivity_class() == "relaxed"
+
+
+def test_selectivity_class_none_when_absent(enriched_item):
+    # not computed (no thresholds / no-filter item) -> no bucket
+    assert enriched_item["computed"].get("filter_selectivity_conjunction") is None
+    assert GroundTruth.from_item(enriched_item).selectivity_class() is None
+
+
 # ─── QueryItem ──────────────────────────────────────────────────────────────
 
 def test_query_item_from_dict(enriched_item):
@@ -202,13 +233,15 @@ def test_raw_results_jsonl_roundtrip(tmp_path):
 
 # ─── QueryMetrics ───────────────────────────────────────────────────────────
 
-def _qm(qid, *, scorable=None, recall=None, rank=None, lat=None):
+def _qm(qid, *, scorable=None, recall=None, rank=None, lat=None,
+        sel=None, harm=False):
     """QueryMetrics from per-condition dicts; conditions default to whatever the
     rank dict names."""
     rank = rank or {}
     scorable = {c: True for c in rank} if scorable is None else scorable
     return QueryMetrics(qid, scorable, recall or {c: {} for c in rank}, rank,
-                        lat or {c: 1.0 for c in rank})
+                        lat or {c: 1.0 for c in rank},
+                        selectivity=sel, harm_exemplar=harm)
 
 
 def test_query_metrics_reciprocal_rank():
@@ -279,7 +312,33 @@ def test_metrics_empty_is_safe():
     assert m.conditions() == []
     assert m.mean_recall(FILT, 5) == 0.0
     assert m.mrr(FILT) == 0.0
-    assert m.median_latency(FILT) == 0.0
+
+
+def test_query_metrics_selectivity_class():
+    from frame.core.schema import SELECTIVE_MAX
+    assert _qm("q1", rank={FILT: 1}, sel=None).selectivity_class() is None
+    assert _qm("q1", rank={FILT: 1}, sel=SELECTIVE_MAX / 2).selectivity_class() == "selective"
+    assert _qm("q1", rank={FILT: 1}, sel=SELECTIVE_MAX).selectivity_class() == "relaxed"
+
+
+def test_query_metrics_to_dict_carries_grouping_keys():
+    d = _qm("q1", rank={FILT: 1}, sel=0.004, harm=True).to_dict()
+    assert d["selectivity"] == 0.004
+    assert d["harm_exemplar"] is True
+
+
+def test_metrics_restricted_is_a_subset_view():
+    m = Metrics(system="s", ks=(5,), retrieval_k=1000, per_query=[
+        _qm("q1", rank={FILT: 1, NOFILT: 1}),
+        _qm("q2", rank={FILT: 2, NOFILT: 2}),
+        _qm("q3", rank={FILT: 4, NOFILT: 4}),
+    ])
+    sub = m.restricted({"q1", "q3"})
+    assert [q.query_id for q in sub.per_query] == ["q1", "q3"]
+    # provenance is preserved so a subgroup is still attributable / cap-checkable
+    assert sub.system == "s" and sub.retrieval_k == 1000
+    assert m.mrr(FILT) == (1 / 1 + 1 / 2 + 1 / 4) / 3     # original untouched
+    assert sub.mrr(FILT) == (1 / 1 + 1 / 4) / 2
 
 
 def test_metrics_write_jsonl(tmp_path):

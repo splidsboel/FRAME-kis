@@ -124,6 +124,18 @@ _INDEXES = (
     f"WITH (m='{HNSW_M}', ef_construction='{HNSW_EF_CONSTRUCTION}')",
 )
 
+# Index names, for the union (re)load which must DROP them before appending several
+# shards and rebuild ONCE at the end — streaming millions of rows into a live HNSW
+# index is correct but pathologically slow. Kept in sync with _INDEXES by hand
+# (there are ten of them); a mismatch only means a stale index is left to be
+# rebuilt, which CREATE INDEX IF NOT EXISTS would then skip — so keep them aligned.
+_INDEX_NAMES = (
+    "shots_video_id_idx", "keyframes_video_id_idx", "keyframe_ocr_keyframe_id",
+    "keyframe_ocr_conf", "keyframe_ocr_text_trgm", "idx_scene_labels_keyframe_id",
+    "idx_scene_labels_label", "idx_object_detections_keyframe_id",
+    "idx_object_detections_label", "keyframes_embedding_hnsw_idx",
+)
+
 # Columns COPYed per table, in parquet order. keyframes is absent on purpose: its
 # rows are assembled from the metadata parquet + the embeddings h5 (see
 # _load_keyframes), since the vector lives in a separate file.
@@ -164,20 +176,35 @@ class PgvectorAdapter(VectorDBAdapter):
 
     # ── one-time ingest (Tier 2 -> pgvector's physical layout) ──
     def load_data(self, dataset: Dataset, force: bool = False) -> None:
-        """COPY a canonical shard into the normalised V3C tables, then build the
+        """COPY one canonical shard into the normalised V3C tables, then build the
         indexes. Idempotent: a table whose row count already matches the source
         parquet is skipped; a partially-loaded one is truncated and redone (the
         source is files, so a redo is always safe). `force=True` reloads
-        everything.
+        everything. The ABC entry point — a thin wrapper over load_datasets()."""
+        self.load_datasets([dataset], force=force)
 
-        Streamed end to end — parquet row batches feed a COPY ... FROM STDIN, so
-        a 1.7M-keyframe shard loads in bounded memory. The one thing held whole is
-        the keyframe metadata dict (~4 small fields x N rows, a few hundred MB at
-        V3C scale), needed because vectors arrive from a separate file and must be
-        paired by id rather than by position."""
-        import psycopg2
+    def load_datasets(self, datasets: Sequence[Dataset], force: bool = False) -> None:
+        """Ingest one OR MORE canonical shards into a SINGLE pgvector instance — the
+        union corpus (v3c1+2+3): one HNSW index over every shard's vectors, which is
+        what a filtered-ANN benchmark at scale must search.
 
-        dataset.validate()
+        One shard keeps the old idempotent, per-table, resume-friendly path. Several
+        shards take the union path: it truncates, appends every shard, and builds the
+        indexes ONCE at the end (see _load_union). The shards' primary keys are
+        disjoint across shards (video/shot/keyframe ids are corpus-wide unique) with
+        one exception — object_detections.id is assigned per shard at consolidate, so
+        the union append reassigns it from a running counter to keep it unique.
+
+        Streamed end to end — parquet row batches feed COPY ... FROM STDIN, so a
+        multi-million-row shard loads in bounded memory. The one thing held whole is
+        each shard's keyframe metadata dict (~4 small fields x N rows), needed
+        because vectors arrive from a separate file and must be paired by id."""
+        datasets = list(datasets)
+        if not datasets:
+            raise ValueError("load_datasets: no datasets given")
+        for ds in datasets:
+            ds.validate()
+
         own_conn = self._conn is None
         if own_conn:
             self._connect()
@@ -185,52 +212,137 @@ class PgvectorAdapter(VectorDBAdapter):
         assert conn is not None
 
         try:
-            print(f"[load] {dataset.name} -> pgvector ({dataset.path})", flush=True)
+            names = ", ".join(d.name for d in datasets)
+            print(f"[load] {names} -> pgvector", flush=True)
             with conn.cursor() as cur:
-                cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-                # pg_trgm backs keyframe_ocr_text_trgm (the pattern-match filter).
-                try:
-                    cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
-                except psycopg2.Error as e:
-                    print(f"[load] WARNING: pg_trgm unavailable ({e}); "
-                          "the OCR trigram index will be skipped", flush=True)
-                for table, ddl in _DDL.items():
-                    cur.execute(ddl)
+                self._create_schema(cur)
 
-            self._load_keyframes(dataset, force=force)
-            for table in _COPY_COLUMNS:
-                if dataset.has_table(table):
-                    self._copy_table(dataset, table, force=force)
-                else:
-                    print(f"[load] skip {table}: not in this shard", flush=True)
+            if len(datasets) == 1:
+                ds = datasets[0]
+                self._load_keyframes(ds, force=force)
+                for table in _COPY_COLUMNS:
+                    if ds.has_table(table):
+                        self._copy_table(ds, table, force=force)
+                    else:
+                        print(f"[load] skip {table}: not in this shard", flush=True)
+                build = True
+            else:
+                build = self._load_union(datasets, force=force)
 
-            print("[load] building indexes (this is the slow part) ...", flush=True)
-            with conn.cursor() as cur:
-                for stmt in _INDEXES:
-                    try:
-                        cur.execute(stmt)
-                    except psycopg2.Error as e:
-                        # A missing extension (pg_trgm) must not sink the whole load.
-                        print(f"[load] WARNING: index failed: {e}", flush=True)
-                for table in _ANALYZE_TABLES:
-                    if _table_exists(cur, table):
-                        cur.execute(f"ANALYZE {table};")
+            if build:
+                self._build_indexes()
+            self._analyze()
             print("[load] done", flush=True)
         finally:
             if own_conn:
                 self.teardown()
 
+    def _create_schema(self, cur) -> None:
+        import psycopg2
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        # pg_trgm backs keyframe_ocr_text_trgm (the pattern-match filter).
+        try:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+        except psycopg2.Error as e:
+            print(f"[load] WARNING: pg_trgm unavailable ({e}); "
+                  "the OCR trigram index will be skipped", flush=True)
+        for ddl in _DDL.values():
+            cur.execute(ddl)
+
+    def _build_indexes(self) -> None:
+        import psycopg2
+        assert self._conn is not None
+        print("[load] building indexes (this is the slow part) ...", flush=True)
+        with self._conn.cursor() as cur:
+            for stmt in _INDEXES:
+                try:
+                    cur.execute(stmt)
+                except psycopg2.Error as e:
+                    # A missing extension (pg_trgm) must not sink the whole load.
+                    print(f"[load] WARNING: index failed: {e}", flush=True)
+
+    def _analyze(self) -> None:
+        assert self._conn is not None
+        with self._conn.cursor() as cur:
+            for table in _ANALYZE_TABLES:
+                if _table_exists(cur, table):
+                    cur.execute(f"ANALYZE {table};")
+
+    def _drop_indexes(self) -> None:
+        assert self._conn is not None
+        with self._conn.cursor() as cur:
+            for name in _INDEX_NAMES:
+                cur.execute(f"DROP INDEX IF EXISTS {name};")
+
+    def _hnsw_exists(self) -> bool:
+        assert self._conn is not None
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('public.keyframes_embedding_hnsw_idx');")
+            return _scalar(cur) is not None
+
+    def _load_union(self, datasets: Sequence[Dataset], force: bool) -> bool:
+        """(Re)load several shards into one instance; return whether indexes need
+        building (False = the union was already loaded and nothing changed).
+
+        Whole-union idempotency: if keyframes already holds exactly the summed
+        vector count and the HNSW index is present, this is a no-op. Anything else
+        (a partial load, a single-shard load, or --force) drops the indexes,
+        truncates every table, and appends all shards fresh — then load_datasets
+        rebuilds the indexes once. A cross-shard append is safe only after the
+        indexes are gone; the alternative (inserting millions of rows into a live
+        HNSW index) is correct but far too slow."""
+        assert self._conn is not None
+        total_kf = sum(ds.embedding_count() for ds in datasets)
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM keyframes;")
+            have = _scalar(cur)
+
+        if not force and have == total_kf and total_kf > 0 and self._hnsw_exists():
+            print(f"[load] union already loaded: {have:,} keyframes across "
+                  f"{len(datasets)} shards; skipping (use force to rebuild)", flush=True)
+            return False
+        if have and not force:
+            raise RuntimeError(
+                f"keyframes holds {have:,} rows but the union expects {total_kf:,}. "
+                "A partial or single-shard load is present. Re-run with force=True "
+                "(scripts/load_dataset.py --force) to truncate and rebuild the union.")
+
+        print(f"[load] union (re)load: dropping indexes and truncating "
+              f"{len(datasets)} shards -> {total_kf:,} keyframes", flush=True)
+        self._drop_indexes()
+        with self._conn.cursor() as cur:
+            for table in ("keyframes",) + tuple(_COPY_COLUMNS):
+                if _table_exists(cur, table):
+                    cur.execute(f"TRUNCATE {table};")
+
+        od_counter = [0]   # global object_detections id, unique across shards
+        for ds in datasets:
+            print(f"[load] shard {ds.name} ->", flush=True)
+            self._copy_keyframes(ds, ds.embedding_count())
+            for table in _COPY_COLUMNS:
+                if not ds.has_table(table):
+                    print(f"[load]   skip {table}: not in {ds.name}", flush=True)
+                    continue
+                counter = od_counter if table == "object_detections" else None
+                self._append_table(ds, table, id_counter=counter)
+        return True
+
     def _load_keyframes(self, dataset: Dataset, force: bool = False) -> None:
+        """Guarded single-shard keyframe load — skip/append/raise per _prepare_table,
+        then stream the rows (shared with the union path via _copy_keyframes)."""
+        n_vectors = dataset.embedding_count()
+        if not self._prepare_table("keyframes", n_vectors, force=force):
+            return
+        self._copy_keyframes(dataset, n_vectors)
+
+    def _copy_keyframes(self, dataset: Dataset, n_vectors: int) -> None:
         """keyframes rows = metadata parquet JOINed by id to the embeddings h5.
 
         The h5 drives the loop because it is the big side and must stay streamed;
         a keyframe with no vector is skipped by design (it could never be a k-NN
-        result, and its presence would only distort corpus_size)."""
+        result, and its presence would only distort corpus_size). Assumes the target
+        table is ready to receive rows (caller did the guard/truncate)."""
         assert self._conn is not None
-        n_vectors = dataset.embedding_count()
-        if not self._prepare_table("keyframes", n_vectors, force=force):
-            return
-
         meta = {}
         for batch in dataset.iter_table(
                 "keyframes", columns=["keyframe_id", "shot_id", "video_id", "frame_number"]):
@@ -265,17 +377,32 @@ class PgvectorAdapter(VectorDBAdapter):
                   flush=True)
 
     def _copy_table(self, dataset: Dataset, table: str, force: bool = False) -> None:
-        cols = _COPY_COLUMNS[table]
+        """Guarded single-shard table load (skip/append/raise), then stream rows."""
         expected = dataset.table_rows(table)
         if not self._prepare_table(table, expected, force=force):
             return
+        self._append_table(dataset, table)
 
+    def _append_table(self, dataset: Dataset, table: str,
+                      id_counter: list[int] | None = None) -> None:
+        """Stream one shard's table into the (already prepared) target with COPY.
+
+        `id_counter` — when given (a one-element mutable [n]) — REPLACES each row's
+        `id` with a running global value, so object_detections.id stays unique across
+        shards despite each shard's consolidate assigning it 0-based. Only used on
+        the union append path; single-shard loads keep the parquet id verbatim."""
+        cols = _COPY_COLUMNS[table]
+        expected = dataset.table_rows(table)
         n = 0
 
         def rows():
             nonlocal n
             for batch in dataset.iter_table(table, columns=list(cols)):
                 for row in batch:
+                    if id_counter is not None:
+                        row = dict(row)
+                        row["id"] = id_counter[0]
+                        id_counter[0] += 1
                     yield _copy_line(tuple(row[c] for c in cols))
                 n += len(batch)
                 print(f"[load]   {table} {n:,}/{expected:,}", flush=True)

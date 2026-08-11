@@ -92,6 +92,22 @@ PRIMARY_UNFILTERED = "raw+nofilter"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Selectivity subdivision of the FILTER workload (Omar, 2026-08-10): split the
+# filtered queries into a "selective" and a "relaxed" bucket, so the filter delta
+# can be read separately for tight vs broad predicates (broad filters are also
+# where pgvector's planner keeps the approximate HNSW path — see the profiler).
+#
+# The boundary is the CONJUNCTION selectivity (fraction of the corpus the full
+# AND-ed predicate keeps), computed by the oracle and stored per item. It was set
+# EMPIRICALLY from the v3c1 distribution: sorted, there is a clean gap between
+# 2.66% and 5.19% (18 queries below, 12 above), so the cut sits in that gap.
+# Selectivity is CORPUS-RELATIVE — re-derive this against the union distribution
+# once the corpus changes. One number, one place.
+SELECTIVE_MAX = 0.03
+SELECTIVITY_CLASSES = ("selective", "relaxed")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Ground truth for one item — read out of the item's `computed` block.
 # Field names mirror queryset/build.py's computed_stub / oracle/build_gt.py output.
 # `None` means "not yet computed on the HPC" (item still pending GT).
@@ -110,6 +126,10 @@ class GroundTruth:
     gt_vec_nofilter: list[str] | None  # vector_query, no filter   (semantic+nofilter);
                                        # also the neighbour list the filtered HNSW walk
                                        # traverses, used by the profiler for pass-rate
+    # Corpus fraction the FULL (AND-ed) predicate keeps at the pinned thresholds —
+    # the conjunction selectivity, computed by the oracle. None until GT is run
+    # with thresholds (and for no-filter items). Drives selectivity_class().
+    filter_selectivity_conjunction: float | None = None
 
     @property
     def is_scorable(self) -> bool:
@@ -119,6 +139,26 @@ class GroundTruth:
 
     def gt_for(self, cond: Condition) -> list[str] | None:
         return getattr(self, cond.gt_attr)
+
+    @property
+    def is_harm_exemplar(self) -> bool:
+        """A FILTERED item whose own target is excluded by its own filter. Derived
+        from GT, so it needs no re-authoring: target_passes_filter is None for a
+        no-filter item and True when the target survives, so exactly `is False`
+        marks the filter-harm exemplars (q0003/06/13/20, and any future item whose
+        target its filter drops). These are the discriminator between exact and
+        fuzzy filtering — a hard filter drops the target, a soft one could keep it
+        (Omar, 2026-08-03/10)."""
+        return self.target_passes_filter is False
+
+    def selectivity_class(self) -> str | None:
+        """"selective" | "relaxed" by conjunction selectivity, or None when it has
+        not been computed (no-filter items, or GT run without thresholds). Boundary:
+        schema.SELECTIVE_MAX (set empirically — see the note there)."""
+        s = self.filter_selectivity_conjunction
+        if s is None:
+            return None
+        return "selective" if s < SELECTIVE_MAX else "relaxed"
 
     def scorable_for(self, cond: Condition) -> bool:
         """A cell is scorable once its own exact answer exists and — for the two
@@ -146,6 +186,7 @@ class GroundTruth:
             gt_nofilter=c.get("geometric_gt_nofilter"),
             gt_raw_filtered=c.get("geometric_gt_raw_filtered"),
             gt_vec_nofilter=c.get("geometric_gt_vec_nofilter"),
+            filter_selectivity_conjunction=c.get("filter_selectivity_conjunction"),
         )
 
 
@@ -319,6 +360,16 @@ class QueryMetrics:
     recall: dict[str, dict[int, float]]         # condition -> k -> recall@k
     target_rank: dict[str, int | None]          # condition -> 1-based rank of target
     latency_ms: dict[str, float]                # condition -> warm median latency
+    # Grouping keys, carried so the metrics file is self-describing (plots and
+    # subgroup summaries bucket without re-reading the benchmark GT). None when the
+    # item has no filter / no computed selectivity.
+    selectivity: float | None = None            # conjunction selectivity of the filter
+    harm_exemplar: bool = False                 # target excluded by its own filter
+
+    def selectivity_class(self) -> str | None:
+        if self.selectivity is None:
+            return None
+        return "selective" if self.selectivity < SELECTIVE_MAX else "relaxed"
 
     def conditions(self) -> list[str]:
         return [c for c in CONDITION_NAMES if c in self.target_rank]
@@ -339,6 +390,8 @@ class QueryMetrics:
             "target_rank": self.target_rank,
             "rr": {c: self.rr(c) for c in self.conditions()},
             "latency_ms": self.latency_ms,
+            "selectivity": self.selectivity,
+            "harm_exemplar": self.harm_exemplar,
         }
 
 
@@ -360,6 +413,19 @@ class Metrics:
         """Conditions this run produced, in canonical order."""
         seen = {c for m in self.per_query for c in m.conditions()}
         return [c for c in CONDITION_NAMES if c in seen]
+
+    def restricted(self, ids: Iterable[str]) -> "Metrics":
+        """A view over just `ids` — same provenance, subset of per-query rows. Lets
+        every aggregate (recall / MRR / latency / comparable) be reported over a
+        named subgroup (a selectivity bucket, the harm exemplars) with no special
+        casing: subset, then reuse the existing methods."""
+        keep = set(ids)
+        return Metrics(
+            system=self.system, ks=self.ks,
+            per_query=[m for m in self.per_query if m.query_id in keep],
+            retrieval_k=self.retrieval_k, benchmark=self.benchmark,
+            harness_contract=self.harness_contract,
+        )
 
     def cap_is_meaningful(self, cap: int) -> bool:
         """False when the cap is at or above the run's retrieval depth."""

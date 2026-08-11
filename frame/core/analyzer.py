@@ -91,6 +91,35 @@ def check_compatible(raw: RawResults, benchmark: BenchmarkVersion | None,
 
 DEFAULT_KS = (5, 25, 50, 100, 1000)
 
+# The two 2x2 cells that apply the predicate — their presence on an item means the
+# item HAS a filter (the Runner omits them for no-filter items). Used to split the
+# filtered workload out of a Metrics without re-reading the benchmark GT.
+FILTER_CONDS = ("semantic+filter", "raw+filter")
+
+
+def query_groups(m: "Metrics") -> dict[str, list[str]]:
+    """Named query subsets for subgroup reporting, derived from the Metrics alone
+    (QueryMetrics carries selectivity + harm_exemplar). Empty groups are dropped.
+
+      no-filter / filtered   — the predicate axis of the workload
+      selective / relaxed    — the filtered workload split by conjunction
+                               selectivity (schema.SELECTIVE_MAX)
+      harm-exemplar          — filtered items whose target its own filter excludes
+    """
+    order = ("no-filter", "filtered", "selective", "relaxed", "harm-exemplar")
+    groups: dict[str, list[str]] = {n: [] for n in order}
+    for q in m.per_query:
+        has_filter = any(c in q.target_rank for c in FILTER_CONDS) \
+            or q.selectivity is not None
+        groups["filtered" if has_filter else "no-filter"].append(q.query_id)
+        cls = q.selectivity_class()
+        if cls:
+            groups[cls].append(q.query_id)
+        if q.harm_exemplar:
+            groups["harm-exemplar"].append(q.query_id)
+    return {name: ids for name, ids in groups.items() if ids}
+
+
 # Rank caps for MRR (Omar, 28-07-2026): a target found deeper than the cap counts
 # as a MISS. Deliberately a different set from DEFAULT_KS — those are fine-grained
 # recall slices, these are "how deep would a VBS user realistically look".
@@ -99,9 +128,19 @@ DEFAULT_MRR_CAPS = (1000, 100, 50, 10)
 
 class Analyzer:
     def __init__(self, ks: Sequence[int] = DEFAULT_KS,
-                 mrr_caps: Sequence[int] = DEFAULT_MRR_CAPS):
+                 mrr_caps: Sequence[int] = DEFAULT_MRR_CAPS,
+                 score_harm_exemplars: bool = False):
         self.ks = tuple(ks)
         self.mrr_caps = tuple(mrr_caps)
+        # When True, the filter cells of a harm exemplar (target excluded by its own
+        # filter) are scored anyway — recall counts, the target rank is a miss —
+        # instead of being marked unscorable. This is the `--exemplars include`
+        # mode: it folds the harm exemplars into the headline aggregate so their
+        # cost is visible in it, rather than only in a separate group. Off by
+        # default: the honest headline compares systems on items the filter does not
+        # sabotage by construction. Soft filtering (which could rescue these) is out
+        # of scope for now — see the vault note on the exclusive-query flag.
+        self.score_harm_exemplars = score_harm_exemplars
 
     def analyze(self, raw: RawResults, items: Sequence[QueryItem],
                 benchmark: "BenchmarkVersion | None" = None,
@@ -135,10 +174,18 @@ class Analyzer:
         recall: dict[str, dict[int, float]] = {}
         rank: dict[str, int | None] = {}
 
+        # include-mode override: a harm exemplar's filter cells have valid GT (the
+        # exact filtered k-NN exists, it just excludes the target), so the only
+        # reason they are unscorable is target_passes_filter. When asked, score them
+        # anyway — recall counts against that GT, the target rank comes out a miss.
+        force = self.score_harm_exemplars and gt is not None and gt.is_harm_exemplar
+
         for cond in CONDITIONS:
             if cond.name not in r.ids:
                 continue            # the run did not produce this cell for this item
             ok = gt is not None and gt.scorable_for(cond)
+            if not ok and force and gt is not None and cond.filtered and gt.gt_for(cond):
+                ok = True
             scorable[cond.name] = ok
             recall[cond.name] = {k: 0.0 for k in self.ks}
             rank[cond.name] = None
@@ -155,6 +202,8 @@ class Analyzer:
             recall=recall,
             target_rank=rank,
             latency_ms=dict(r.latency_ms),
+            selectivity=gt.filter_selectivity_conjunction if gt else None,
+            harm_exemplar=gt.is_harm_exemplar if gt else False,
         )
 
     def headline_cap(self, m: Metrics) -> int | None:
@@ -214,6 +263,54 @@ class Analyzer:
                          f"{m.latency_n(c):>4}")
         return "\n".join(lines)
 
+    # ── subgroup reporting (selectivity subdivision) ────────────────────────────
+    def summary_by_selectivity(self, m: Metrics) -> str:
+        """The filtered workload split into selective vs relaxed (Omar, 2026-08-10),
+        each rendered as its own full summary. Only the buckets present are shown;
+        the split is over CONJUNCTION selectivity (schema.SELECTIVE_MAX)."""
+        groups = query_groups(m)
+        out: list[str] = []
+        for name in ("selective", "relaxed"):
+            if name not in groups:
+                continue
+            sub = m.restricted(groups[name])
+            out += ["", "=" * 66,
+                    f"selectivity bucket: {name}  ({len(sub.per_query)} filtered items)",
+                    "=" * 66, self.summary(sub)]
+        return "\n".join(out)
+
+    # ── harm-exemplar reporting (the include/exclude flag's ISOLATE view) ────────
+    def harm_exemplar_report(self, m: Metrics) -> str:
+        """The filter-harm exemplars, reported on their own terms. Their filter
+        cells are unscorable by construction (the target fails its own filter), so a
+        recall/MRR table over them reads as all-zero and hides the point. What is
+        worth showing is that the target IS findable without the filter — so this
+        lists, per exemplar, the no-filter target ranks next to the fact that the
+        filter drops it. That contrast is the harm, quantified (Omar, 2026-08-03/10).
+
+        (Under `--exemplars include` these same items are ALSO folded into the
+        headline; this report is orthogonal and always over the no-filter cells.)"""
+        ex = [q for q in m.per_query if q.harm_exemplar]
+        if not ex:
+            return ""
+        out = ["", "=" * 66,
+               f"filter-harm exemplars — {len(ex)} item(s) whose target its own "
+               f"filter excludes", "=" * 66,
+               "target is excluded under HARD filtering; shown are the no-filter "
+               "ranks (the target IS findable) vs the filter outcome",
+               f"{'qid':>6} | {'sel%':>7} | {'raw nofilt':>10} | "
+               f"{'sem nofilt':>10} | filter outcome"]
+        out.append("-" * 62)
+        for q in sorted(ex, key=lambda x: x.query_id):
+            sel = f"{q.selectivity * 100:.3f}" if q.selectivity is not None else "n/a"
+            rr = _fmt_rank(q.target_rank.get("raw+nofilter"))
+            sr = _fmt_rank(q.target_rank.get("semantic+nofilter"))
+            # whether the filter cells were scored (include mode) or dropped
+            filt = "scored (target = miss)" if q.is_scorable("semantic+filter") \
+                else "dropped (target fails filter)"
+            out.append(f"{q.query_id:>6} | {sel:>7} | {rr:>10} | {sr:>10} | {filt}")
+        return "\n".join(out)
+
     def _grid(self, m: Metrics) -> list[str]:
         """The 2x2 read as a grid: the filter delta down one axis, the raw-vs-
         semantic delta across the other. Only drawn when all four cells ran —
@@ -259,3 +356,9 @@ def _first_rank(retrieved: list[str], targets: set[str]) -> int | None:
         if kid in targets:
             return i
     return None
+
+
+def _fmt_rank(rank: int | None) -> str:
+    """A 1-based rank for the harm-exemplar table, or 'not found' when the target
+    never appears in that cell's ranking."""
+    return f"r{rank}" if rank else "not found"

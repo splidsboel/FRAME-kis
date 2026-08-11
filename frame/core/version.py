@@ -51,12 +51,18 @@ DIGEST_LEN = 12
 # _pending are bookkeeping and deliberately excluded.
 GT_FIELDS = (
     "target_keyframe_ids", "target_passes_filter", "filter_selectivity",
+    "filter_selectivity_conjunction",
     "geometric_gt_filtered", "geometric_gt_nofilter",
     "geometric_gt_raw_filtered", "geometric_gt_vec_nofilter",
     "scene_threshold", "object_threshold",
 )
 # Fields whose presence means "the oracle has run on this item" — see _gt_core.
-GT_PRESENCE_FIELDS = tuple(f for f in GT_FIELDS if f != "filter_selectivity")
+# The selectivity summaries are excluded: filter_selectivity is stubbed to
+# [None]*n (a non-None value) and the conjunction is only filled in the
+# t-dependent block, so neither is a reliable "oracle ran" signal.
+GT_PRESENCE_FIELDS = tuple(
+    f for f in GT_FIELDS
+    if f not in ("filter_selectivity", "filter_selectivity_conjunction"))
 
 
 def _sha(obj) -> str:

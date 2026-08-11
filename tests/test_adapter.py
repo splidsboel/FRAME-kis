@@ -68,3 +68,16 @@ def test_search_receives_filters_and_k(fake_adapter):
     ids = fake_adapter.search(np.zeros(4, dtype=np.float32), [], k=3)
     assert ids == ["kf_x", "kf_target", "kf_y"]
     assert fake_adapter.search_calls[-1] == (0, 3)
+
+
+def test_load_datasets_default_single_delegates(fake_adapter):
+    """The ABC default handles a single shard by delegating to load_data()."""
+    fake_adapter.load_datasets(["shardA"])
+    assert fake_adapter.load_calls == ["shardA"]
+
+
+def test_load_datasets_default_rejects_multi(fake_adapter):
+    """The multi-shard union load is a physical-layout decision each system must
+    make explicitly; the default refuses rather than loading shards independently."""
+    with pytest.raises(NotImplementedError):
+        fake_adapter.load_datasets(["shardA", "shardB"])

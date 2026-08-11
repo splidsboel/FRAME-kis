@@ -55,6 +55,20 @@ class VectorDBAdapter(ABC):
         by `with adapter:`; it is run out of band (scripts/load_dataset.py),
         because a benchmark run must never pay a multi-million-row ingest."""
 
+    def load_datasets(self, datasets: Sequence[Dataset], force: bool = False) -> None:
+        """Ingest one OR MORE canonical shards. Default: a single shard delegates to
+        load_data(); the multi-shard UNION corpus (one index over every shard) must
+        be implemented per system, since how shards are merged is a physical-layout
+        decision (pgvector overrides this). `force` is honoured only by adapters that
+        accept it on load_data()."""
+        datasets = list(datasets)
+        if len(datasets) == 1:
+            self.load_data(datasets[0])
+            return
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement a multi-shard union load; "
+            "load shards individually or add load_datasets() to this adapter")
+
     @abstractmethod
     def setup(self) -> None:
         """PER-RUN: bring an already-loaded system to a queryable state — connect,

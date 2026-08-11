@@ -104,7 +104,7 @@ def test_main_compiles_items(tmp_path, authored_item, monkeypatch):
     monkeypatch.setattr(build, "OUT", str(out))
 
     with pytest.raises(SystemExit) as exc:
-        build.main()
+        build.main([])
     assert exc.value.code == 0  # no bad items
 
     lines = out.read_text().splitlines()
@@ -138,7 +138,7 @@ def test_main_carries_ground_truth_forward(tmp_path, authored_item, enriched_ite
     monkeypatch.setattr(build, "QDIR", str(qdir))
     monkeypatch.setattr(build, "OUT", str(out))
     with pytest.raises(SystemExit):
-        build.main()
+        build.main([])
 
     rebuilt = json.loads(out.read_text().splitlines()[1])
     assert rebuilt["computed"]["geometric_gt_filtered"] == \
@@ -149,7 +149,7 @@ def test_main_carries_ground_truth_forward(tmp_path, authored_item, enriched_ite
     edited["decomposition"]["vector_query"] = "something else entirely"
     (qdir / "q0001.json").write_text(json.dumps(edited))
     with pytest.raises(SystemExit):
-        build.main()
+        build.main([])
     assert json.loads(out.read_text().splitlines()[1])["computed"][
         "geometric_gt_filtered"] is None
 
@@ -167,7 +167,7 @@ def test_main_rejects_invalid_item_nonzero_exit(tmp_path, authored_item, monkeyp
     monkeypatch.setattr(build, "OUT", str(tmp_path / "data" / "benchmark.jsonl"))
 
     with pytest.raises(SystemExit) as exc:
-        build.main()
+        build.main([])
     assert exc.value.code == 1  # a rejected item => nonzero exit
 
 
@@ -183,5 +183,5 @@ def test_main_rejects_duplicate_ids(tmp_path, authored_item, monkeypatch):
     monkeypatch.setattr(build, "OUT", str(tmp_path / "data" / "benchmark.jsonl"))
 
     with pytest.raises(SystemExit) as exc:
-        build.main()
+        build.main([])
     assert exc.value.code == 1

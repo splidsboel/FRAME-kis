@@ -564,7 +564,7 @@ def main():
         for stale in ("target_passes_filter", "geometric_gt_filtered",
                       "target_rank_filtered", "geometric_gt_raw_filtered",
                       "target_rank_raw_filtered", "scene_threshold",
-                      "object_threshold"):
+                      "object_threshold", "filter_selectivity_conjunction"):
             c.pop(stale, None)
 
         ready = bool(filters) and all(filter_ready(f, thresholds) for f in filters)
@@ -575,6 +575,14 @@ def main():
                 if ft in FILTER_SOURCES:
                     c[f"{ft}_threshold"] = thresholds[ft]
             c["target_passes_filter"] = target_passes(cur, tkfs, filters, thresholds)
+            # conjunction selectivity: corpus fraction the FULL AND-ed predicate keeps
+            # at the pinned thresholds. The single number the selectivity buckets
+            # (schema.SELECTIVE_MAX) split on — and, unlike the per-filter
+            # filter_selectivity list, the true conjunctive count. Same predicate SQL
+            # the GT/target_passes use, so it is exactly consistent with them.
+            where_conj, wp_conj = predicate_to_sql(filters, thresholds)
+            cur.execute(f"SELECT count(*) FROM keyframes k WHERE {where_conj}", wp_conj)
+            c["filter_selectivity_conjunction"] = (cur.fetchone()[0] / total) if total else None
             c["geometric_gt_filtered"] = brute_knn(cur, emb_vec, args.k, filters, thresholds)
             c["target_rank_filtered"] = target_rank(cur, emb_vec, tkfs, filters, thresholds)
             c["geometric_gt_raw_filtered"] = brute_knn(cur, emb_raw, args.k, filters, thresholds)

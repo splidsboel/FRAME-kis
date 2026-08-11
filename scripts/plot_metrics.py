@@ -49,6 +49,7 @@ BLUE, ORANGE, GREEN, MAGENTA, GRAY = "#2a78d6", "#eb6834", "#008300", "#e87ba4",
 INK, INK2, MUTED, GRID = "#0b0b0b", "#52514e", "#898781", "#e1e0d9"
 
 MRR_CAPS = (1000, 100, 50, 10)          # mirrors analyzer.DEFAULT_MRR_CAPS
+SELECTIVE_MAX = 0.03                     # mirrors schema.SELECTIVE_MAX (see note there)
 
 mpl.rcParams.update({
     "figure.dpi": 120,
@@ -131,6 +132,24 @@ def comparable(rows, conds):
     (mirrors Metrics.comparable)."""
     return [r for r in rows
             if all((r.get("scorable") or {}).get(c) for c in conds)]
+
+
+def by_selectivity(rows):
+    """(selective, relaxed) split of the FILTERED items on conjunction selectivity
+    (mirrors schema.SELECTIVE_MAX). Items without a selectivity (no-filter, or GT
+    without thresholds) are in neither."""
+    sel = [r for r in rows if r.get("selectivity") is not None
+           and r["selectivity"] < SELECTIVE_MAX]
+    rel = [r for r in rows if r.get("selectivity") is not None
+           and r["selectivity"] >= SELECTIVE_MAX]
+    return sel, rel
+
+
+def _mean_recall(rows, cond, k):
+    if not rows:
+        return 0.0
+    return float(np.mean([(r["recall"].get(cond) or {}).get(str(k), 0.0)
+                          for r in rows]))
 
 
 def _mrr(rows, cond, cap):
@@ -327,6 +346,87 @@ def plot_condition_grid(rows, out, system, retrieval_k, conds, stamp=None):
     save(fig, out, "condition_grid", stamp)
 
 
+# ─── 5. Recall@k split by filter selectivity ────────────────────────────────
+
+def plot_selectivity_recall(rows, out, system, ks, conds, stamp=None):
+    """Geometric correctness split into selective vs relaxed filters (Omar,
+    2026-08-10): the filter delta is read separately for tight and broad predicates
+    — broad filters are also where pgvector keeps the approximate HNSW path, so
+    this is where recall loss is expected to concentrate."""
+    sel, rel = by_selectivity(rows)
+    if not sel and not rel:
+        print("  (no per-item selectivity — skipping selectivity_recall)")
+        return
+    cut = SELECTIVE_MAX * 100
+    panels = [(f"selective (<{cut:g}%)", sel), (f"relaxed (≥{cut:g}%)", rel)]
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True, squeeze=False)
+    for ax, (title, subset) in zip(axes[0], panels):
+        cmp = comparable(subset, conds)
+        for cond in conds:
+            means = [_mean_recall(cmp, cond, k) for k in ks]
+            ax.plot(ks, means, marker="o", color=COND_COLOR.get(cond, GRAY),
+                    linewidth=1.8, markersize=5, label=cond)
+        ax.set_xscale("log")
+        ax.set_xticks(ks)
+        ax.set_xticklabels([str(k) for k in ks])
+        ax.set_xlabel("k")
+        ax.set_ylim(0, 1.02)
+        ax.set_title(f"{title} — {len(cmp)} comparable")
+    axes[0][0].set_ylabel("mean Recall@k vs that condition's exact k-NN")
+    axes[0][1].legend(frameon=False, loc="lower right", fontsize=8)
+    fig.suptitle(f"Geometric correctness by filter selectivity — {system}")
+    fig.tight_layout()
+    save(fig, out, "selectivity_recall", stamp)
+
+
+# ─── 6. Filter-harm exemplars ────────────────────────────────────────────────
+
+def plot_harm_exemplars(rows, out, system, stamp=None):
+    """The filter-harm exemplars: the target's rank WITHOUT the filter (it is
+    findable) next to the fact that the filter excludes it entirely. That contrast
+    is the harm the exclusive-filter queries exist to measure (Omar, 2026-08-03/10).
+    """
+    ex = sorted((r for r in rows if r.get("harm_exemplar")),
+                key=lambda r: r["query_id"])
+    if not ex:
+        print("  (no harm exemplars — skipping harm_exemplars)")
+        return
+
+    def rank(r, cond):
+        v = (r.get("target_rank") or {}).get(cond)
+        return v if v else np.nan
+
+    y = np.arange(len(ex))
+    raw = [rank(r, "raw+nofilter") for r in ex]
+    sem = [rank(r, "semantic+nofilter") for r in ex]
+
+    fig, ax = plt.subplots(figsize=(7.2, max(3.0, len(ex) * 0.7)))
+    ax.scatter(raw, y - 0.12, s=60, color=BLUE, zorder=3, label="raw, no filter",
+               edgecolors="white", linewidths=0.6)
+    ax.scatter(sem, y + 0.12, s=60, color=GREEN, zorder=3,
+               label="semantic, no filter", edgecolors="white", linewidths=0.6)
+    ax.set_xscale("log")
+    ax.set_xlim(left=0.8)
+    ax.set_yticks(y)
+    ax.set_yticklabels([f"{r['query_id']}  ({r['selectivity']*100:.3f}%)"
+                        if r.get("selectivity") is not None else r["query_id"]
+                        for r in ex], fontsize=8)
+    ax.set_xlabel("rank of the target keyframe, no filter (log, lower is better)")
+    ax.axvline(1, color=GREEN, linewidth=0.9, linestyle=":", zorder=1)
+    ax.annotate("rank 1", (1, ax.get_ylim()[1]), xytext=(3, -4),
+                textcoords="offset points", fontsize=7, color=GREEN)
+    ax.grid(axis="y", visible=False)
+    ax.legend(frameon=False, loc="lower right", fontsize=8)
+    # The harm is the same for every exemplar (the hard filter drops the target),
+    # so state it once rather than repeating it per row.
+    ax.set_title(f"Filter-harm exemplars — {system}\n"
+                 f"target is findable WITHOUT the filter (shown), but the hard "
+                 f"filter excludes it entirely", fontsize=9.5)
+    fig.tight_layout()
+    save(fig, out, "harm_exemplars", stamp)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="inp", default="data/metrics.pgvector.jsonl")
@@ -359,6 +459,8 @@ def main():
     plot_mrr_caps(rows, args.out, system, retrieval_k, conds, stamp)
     plot_recall_at_k(rows, args.out, system, ks, conds, stamp)
     plot_condition_grid(rows, args.out, system, retrieval_k, conds, stamp)
+    plot_selectivity_recall(rows, args.out, system, ks, conds, stamp)
+    plot_harm_exemplars(rows, args.out, system, stamp)
     print("[done]")
 
 

@@ -321,3 +321,107 @@ def test_no_markers_anywhere_is_allowed(enriched_item):
                    harness_contract=HARNESS_CONTRACT),
         [QueryItem.from_dict(enriched_item)])
     assert len(m.per_query) == 1
+
+
+# ─── grouping: selectivity subdivision + harm exemplars ──────────────────────
+
+def _item(qid, *, selectivity=None, target_passes=True, has_filter=True):
+    """An enriched item dict with a chosen conjunction selectivity / pass flag."""
+    d = {
+        "query_id": qid, "status": "verified", "source": {},
+        "raw_query_text": "text", "decomposition": {"vector_query": "vec"},
+        "target": {"video_id": "v", "start_s": 0.0, "end_s": 1.0},
+        "computed": {
+            "target_keyframe_ids": ["kf_target"],
+            "geometric_gt_nofilter": ["kf_target"],
+            "geometric_gt_vec_nofilter": ["kf_target"],
+        },
+    }
+    if has_filter:
+        d["decomposition"]["filters"] = [
+            {"filter_type": "scene", "attribute": "scene_label", "op": "in",
+             "value": ["x"]}]
+        d["computed"].update({
+            "target_passes_filter": target_passes,
+            "geometric_gt_filtered": ["kf_target", "kf_a"],
+            "geometric_gt_raw_filtered": ["kf_target", "kf_a"],
+            "filter_selectivity_conjunction": selectivity,
+        })
+    return d
+
+
+def test_query_groups_partitions_by_filter_selectivity_and_harm():
+    from frame.core.analyzer import query_groups
+    items = [
+        _item("q1", selectivity=0.001),                       # filtered, selective
+        _item("q2", selectivity=0.20),                        # filtered, relaxed
+        _item("q3", selectivity=0.001, target_passes=False),  # selective + harm exemplar
+        _item("q4", has_filter=False),                        # no-filter
+    ]
+    qitems = [QueryItem.from_dict(d) for d in items]
+    # the Runner omits the filter cells for a no-filter item — mirror that so the
+    # filtered/no-filter split is exercised as it is in a real run
+    results = []
+    for d in items:
+        if d["decomposition"].get("filters"):
+            results.append(_full(d["query_id"], ["kf_target"]))
+        else:
+            results.append(_raw(d["query_id"],
+                                **{NOFILT: ["kf_target"], SEM_NOFILT: ["kf_target"]}))
+    raw = RawResults(system="fake", k=5, results=results)
+    m = Analyzer(ks=(5,)).analyze(raw, qitems)
+    g = query_groups(m)
+    assert set(g["selective"]) == {"q1", "q3"}
+    assert set(g["relaxed"]) == {"q2"}
+    assert set(g["harm-exemplar"]) == {"q3"}
+    assert set(g["no-filter"]) == {"q4"}
+    assert set(g["filtered"]) == {"q1", "q2", "q3"}
+
+
+def test_harm_exemplar_excluded_from_headline_by_default():
+    ok = _item("q1", selectivity=0.001)
+    harm = _item("q2", selectivity=0.001, target_passes=False)
+    qitems = [QueryItem.from_dict(ok), QueryItem.from_dict(harm)]
+    raw = RawResults(system="fake", k=5, results=[
+        _full("q1", ["kf_target"]), _full("q2", ["kf_target"])])
+    m = Analyzer(ks=(5,)).analyze(raw, qitems)
+    # q2's filter cells are unscorable, so it drops out of the common subset
+    assert [q.query_id for q in m.comparable()] == ["q1"]
+    assert m.per_query[1].harm_exemplar is True
+    assert m.per_query[1].is_scorable("semantic+filter") is False
+
+
+def test_include_mode_scores_harm_exemplar_filter_cells():
+    harm = _item("q2", selectivity=0.001, target_passes=False)
+    qitem = QueryItem.from_dict(harm)
+    # the system returns a filtered list that does NOT contain the target
+    raw = RawResults(system="fake", k=5, results=[
+        _raw("q2", **{c: ["kf_a", "kf_b"] for c in CONDITION_NAMES})])
+    m = Analyzer(ks=(5,), score_harm_exemplars=True).analyze(raw, [qitem])
+    q = m.per_query[0]
+    # now the filter cell IS scored: recall counts against gt_filtered, target = miss
+    assert q.is_scorable("semantic+filter") is True
+    assert q.recall["semantic+filter"][5] == 0.5     # gt=[kf_target,kf_a]; hit kf_a
+    assert q.target_rank["semantic+filter"] is None  # target excluded => a miss
+
+
+def test_harm_exemplar_report_shows_nofilter_ranks():
+    harm = _item("q2", selectivity=0.001, target_passes=False)
+    qitem = QueryItem.from_dict(harm)
+    raw = RawResults(system="fake", k=5, results=[
+        _full("q2", ["kf_target"])])         # target at rank 1 in the no-filter cells
+    a = Analyzer(ks=(5,))
+    text = a.harm_exemplar_report(a.analyze(raw, [qitem]))
+    assert "q2" in text
+    assert "r1" in text                       # no-filter rank shown
+    assert "dropped" in text                  # filter outcome noted
+
+
+def test_summary_by_selectivity_reports_both_buckets():
+    items = [_item("q1", selectivity=0.001), _item("q2", selectivity=0.20)]
+    qitems = [QueryItem.from_dict(d) for d in items]
+    raw = RawResults(system="fake", k=5, results=[
+        _full("q1", ["kf_target"]), _full("q2", ["kf_target"])])
+    a = Analyzer(ks=(5,))
+    text = a.summary_by_selectivity(a.analyze(raw, qitems))
+    assert "selective" in text and "relaxed" in text

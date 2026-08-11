@@ -18,6 +18,10 @@ than quietly loading it.
     python scripts/load_dataset.py --dataset data/canonical/v3c1
     python scripts/load_dataset.py --dataset data/canonical/v3c2 --system pgvector
     python scripts/load_dataset.py --dataset data/canonical/v3c1 --describe
+
+    # union corpus (v3c1+2+3) — one HNSW index over every shard:
+    python scripts/load_dataset.py \
+        --dataset data/canonical/v3c1 data/canonical/v3c2 data/canonical/v3c3
 """
 
 from __future__ import annotations
@@ -40,24 +44,29 @@ ADAPTERS = {
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", required=True,
-                    help="path to a canonical shard, e.g. data/canonical/v3c1")
+    ap.add_argument("--dataset", required=True, nargs="+",
+                    help="path(s) to canonical shard(s), e.g. data/canonical/v3c1. "
+                         "Several paths load the UNION corpus into one instance "
+                         "(one HNSW index over every shard).")
     ap.add_argument("--system", default="pgvector", choices=sorted(ADAPTERS))
     ap.add_argument("--force", action="store_true",
-                    help="reload every table even if the row counts already match")
+                    help="reload even if the row counts already match (for the "
+                         "union: truncate and rebuild from scratch)")
     ap.add_argument("--describe", action="store_true",
-                    help="print what the shard contains and exit (no DB needed)")
+                    help="print what the shard(s) contain and exit (no DB needed)")
     args = ap.parse_args()
 
-    dataset = Dataset(args.dataset)
-    dataset.validate()
+    datasets = [Dataset(p) for p in args.dataset]
+    for ds in datasets:
+        ds.validate()
 
     if args.describe:
-        print(dataset.describe())
+        for ds in datasets:
+            print(ds.describe())
         return
 
     adapter = ADAPTERS[args.system]()
-    adapter.load_data(dataset, force=args.force)
+    adapter.load_datasets(datasets, force=args.force)
 
     # Prove the result is queryable through the same path a run will use.
     adapter.setup()

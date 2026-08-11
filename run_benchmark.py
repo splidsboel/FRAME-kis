@@ -55,8 +55,15 @@ PG_ITERATIVE_MODES = ("off", "relaxed_order", "strict_order")
 
 
 def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
-                  allow_mismatch=False):
-    """One full run for one adapter configuration; writes tagged artifacts, returns Metrics."""
+                  allow_mismatch=False, exemplars="isolate"):
+    """One full run for one adapter configuration; writes tagged artifacts, returns Metrics.
+
+    `exemplars` controls how the filter-harm exemplars (target excluded by its own
+    filter) are treated: 'isolate' (default) keeps them out of the headline but
+    reports them separately; 'exclude' keeps them out with only a count note;
+    'include' folds them into the headline aggregate too.
+    """
+    analyzer = Analyzer(score_harm_exemplars=(exemplars == "include"))
     adapter = ADAPTERS[system](**adapter_kwargs)
     with adapter:
         raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(
@@ -65,13 +72,25 @@ def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
     suffix = f".{label}" if label else ""
     raw_path = os.path.join(DATA, f"raw_results.{system}{suffix}.jsonl")
     raw.write_jsonl(raw_path)
-    metrics = Analyzer().analyze(raw, qs.items, benchmark=qs.version,
-                                 allow_mismatch=allow_mismatch)
+    metrics = analyzer.analyze(raw, qs.items, benchmark=qs.version,
+                               allow_mismatch=allow_mismatch)
     metrics_path = os.path.join(DATA, f"metrics.{system}{suffix}.jsonl")
     metrics.write_jsonl(metrics_path)
 
     print()
-    print(Analyzer().summary(metrics))
+    print(analyzer.summary(metrics))
+    # The filtered workload split by conjunction selectivity (Omar, 2026-08-10).
+    sel = analyzer.summary_by_selectivity(metrics)
+    if sel:
+        print(sel)
+    # The filter-harm exemplars, on their own terms — unless suppressed.
+    n_exemplars = sum(1 for q in metrics.per_query if q.harm_exemplar)
+    if n_exemplars and exemplars != "exclude":
+        print(analyzer.harm_exemplar_report(metrics))
+    elif n_exemplars:
+        print(f"\n[note] {n_exemplars} filter-harm exemplar(s) excluded from the "
+              f"headline (target excluded by its own filter); --exemplars isolate to "
+              f"see them")
     print()
     print(f"raw     -> {os.path.relpath(raw_path, HERE)}")
     print(f"metrics -> {os.path.relpath(metrics_path, HERE)}")
@@ -113,6 +132,12 @@ def main():
                     help="score even if the results were not produced against this "
                          "query set / harness version (numbers will NOT be "
                          "comparable — see frame/core/version.py)")
+    ap.add_argument("--exemplars", default="isolate",
+                    choices=["isolate", "exclude", "include"],
+                    help="how to treat the filter-harm exemplars (target excluded by "
+                         "its own filter): 'isolate' keeps them out of the headline "
+                         "but reports them separately (default); 'exclude' just notes "
+                         "the count; 'include' also folds them into the headline")
     ap.add_argument("--explain", metavar="QID",
                     help="diagnostic: EXPLAIN the filtered search for one query "
                          "under iterative_scan off vs relaxed_order, then exit")
@@ -151,7 +176,8 @@ def main():
             print(f"\n{'#'*60}\n# iterative_scan = {mode}\n{'#'*60}")
         results_by_mode[mode] = run_and_score(
             args.system, encoder, qs, args.k,
-            args.warmup, args.repeat, adapter_kwargs, label, args.allow_mismatch)
+            args.warmup, args.repeat, adapter_kwargs, label, args.allow_mismatch,
+            exemplars=args.exemplars)
 
     if len(modes) > 1:
         print_sweep_comparison(results_by_mode, args.k)

@@ -12,6 +12,7 @@ Usage:  python3 queryset/build.py        (or: uv run python queryset/build.py)
 Exit code is non-zero if any item is invalid or has a duplicate id.
 """
 
+import argparse
 import glob
 import json
 import os
@@ -71,7 +72,17 @@ def computed_stub(item):
     }
 
 
-def main():
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--corpus", default=None,
+                    help="override the corpus label from queryset.json (e.g. "
+                         "'v3c1+2+3' for the union). The corpus is part of the "
+                         "benchmark identity, so results built against different "
+                         "corpora are kept incomparable — see frame/core/version.py.")
+    # argv defaults to sys.argv[1:] for the CLI; callers (tests) pass an explicit
+    # list so this never swallows an outer process's arguments.
+    args = ap.parse_args(argv)
+
     paths = sorted(
         p for p in glob.glob(os.path.join(QDIR, "*.json"))
         if not os.path.basename(p).startswith("_")
@@ -115,13 +126,14 @@ def main():
             item["computed"] = computed_stub(item)
 
     identity = json.load(open(IDENTITY))
+    corpus = args.corpus or identity["corpus"]
     # GT is stubbed here and filled later by the oracle, which rewrites this header
     # with the real gt_params. Carry forward whatever the previous build recorded so
     # a rebuild of unchanged queries does not look like a GT parameter change.
     previous = read_header(OUT)
     gt_params = previous.gt_params if previous else {}
     version = BenchmarkVersion.compute(
-        version=identity["version"], corpus=identity["corpus"],
+        version=identity["version"], corpus=corpus,
         items=items, gt_params=gt_params)
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)

@@ -15,6 +15,10 @@
 #     sbatch build_gt.sh                                          # diagnostics pass
 #     sbatch build_gt.sh --scene-threshold 0.10 --object-threshold 0.30
 #
+# EXCEPT --corpus <label>, which is peeled off and passed to queryset/build.py
+# instead (it labels the benchmark identity, so union GT must be built with it):
+#     sbatch build_gt.sh --corpus v3c1+2+3 --scene-threshold 0.10 --object-threshold 0.30
+#
 # Submit from `ssh hpc3` (never hpc.itu.dk). Stays on `acltr` on purpose: the
 # `scavenge` desktop* nodes have a driver too old for torch cu121, so
 # torch.cuda.is_available() silently comes back False there.
@@ -78,14 +82,26 @@ set -u
 
 export PGHOST="$PGSOCKET"
 
+# Peel --corpus off the args (it belongs to build.py, not build_gt.py); everything
+# else passes straight through to the oracle.
+BUILD_ARGS=()
+GT_ARGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --corpus)   BUILD_ARGS+=(--corpus "$2"); shift 2;;
+        --corpus=*) BUILD_ARGS+=(--corpus "${1#*=}"); shift;;
+        *)          GT_ARGS+=("$1"); shift;;
+    esac
+done
+
 # Always recompile benchmark.jsonl from the authored queries/*.json first, so a
 # stale/hand-edited benchmark.jsonl can never feed the GT run (queries/*.json is
 # the single source of truth).
 echo "[$(date)] Rebuilding data/benchmark.jsonl from queryset/queries/ ..."
-python3 -u "$PROJECT_DIR/queryset/build.py"
+python3 -u "$PROJECT_DIR/queryset/build.py" "${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"}"
 
-echo "[$(date)] Running oracle/build_gt.py $* ..."
-python3 -u "$PROJECT_DIR/oracle/build_gt.py" "$@"
+echo "[$(date)] Running oracle/build_gt.py ${GT_ARGS[@]+"${GT_ARGS[@]}"} ..."
+python3 -u "$PROJECT_DIR/oracle/build_gt.py" "${GT_ARGS[@]+"${GT_ARGS[@]}"}"
 
 echo "[$(date)] Stopping postgres..."
 stop_pg
