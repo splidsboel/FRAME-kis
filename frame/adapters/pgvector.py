@@ -456,6 +456,12 @@ class PgvectorAdapter(VectorDBAdapter):
         import psycopg2  # optional dep (`pgvector` extra)
 
         self._conn = psycopg2.connect(self.dsn) if self.dsn else psycopg2.connect()
+        # Pin the session to UTF-8. Without this the client encoding follows the
+        # server's (SQL_ASCII on this cluster's pg container), and copy_expert then
+        # encodes the str COPY stream as ASCII — a single accented char in a V3C
+        # title/OCR span (é, …) aborts the whole COPY. UTF-8 is safe either way:
+        # transcoded on a UTF8 server, passed through untouched on SQL_ASCII.
+        self._conn.set_client_encoding("UTF8")
         self._conn.autocommit = True
 
     def setup(self) -> None:
