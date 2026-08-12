@@ -393,30 +393,29 @@ def target_rank(cur, emb, target_kf_ids, filters=None, thresholds=None):
     if not target_kf_ids:
         return None
     where, wp = predicate_to_sql(filters, thresholds)
+    # The rank we want is the rank of the *closest* target keyframe that itself
+    # passes the filter, so all we need from the targets is that single smallest
+    # distance. Get it in one primary-key lookup over the (tiny) target id set --
+    # index scans left ON here on purpose: this is an exact fetch of specific
+    # rows, not the approximate-vs-exact question the count(*) below settles.
+    cur.execute(
+        f"SELECT min(k.embedding <=> %s) FROM keyframes k "
+        f"WHERE k.keyframe_id = ANY(%s) AND {where}",
+        [emb, target_kf_ids] + wp)
+    row = cur.fetchone()
+    d = row[0] if row else None
+    if d is None:            # no target keyframe survives the filter
+        return None
+    # Exact rank = 1 + (# filter-passing keyframes strictly closer than that
+    # target). ONE index-off sequential scan, vs. the old one-scan-per-target.
     cur.execute("SET enable_indexscan = off")
     cur.execute("SET enable_bitmapscan = off")
-    best = None
-    for kf in target_kf_ids:
-        # distance of this target keyframe to the query
-        cur.execute("SELECT k.embedding <=> %s FROM keyframes k WHERE k.keyframe_id = %s",
-                    (emb, kf))
-        row = cur.fetchone()
-        if row is None:
-            continue
-        d = row[0]
-        # the target keyframe must itself satisfy the filter to have a rank at all
-        cur.execute(f"SELECT 1 FROM keyframes k WHERE k.keyframe_id = %s AND {where} LIMIT 1",
-                    [kf] + wp)
-        if cur.fetchone() is None:
-            continue
-        # count filter-passing keyframes strictly closer than the target keyframe
-        cur.execute(f"SELECT count(*) FROM keyframes k WHERE (k.embedding <=> %s) < %s AND {where}",
-                    [emb, d] + wp)
-        rank = cur.fetchone()[0] + 1
-        best = rank if best is None else min(best, rank)
+    cur.execute(f"SELECT count(*) FROM keyframes k WHERE (k.embedding <=> %s) < %s AND {where}",
+                [emb, d] + wp)
+    rank = cur.fetchone()[0] + 1
     cur.execute("RESET enable_indexscan")
     cur.execute("RESET enable_bitmapscan")
-    return best
+    return rank
 
 
 # ── Encoder ─────────────────────────────────────────────────────────────────

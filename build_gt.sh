@@ -3,8 +3,8 @@
 #SBATCH --partition=acltr
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
-#SBATCH --time=03:00:00
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/build_gt_%j.out
 
 # Enrich data/benchmark.jsonl with DB-computed ground truth. Needs BOTH a GPU
@@ -38,8 +38,16 @@ PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
 mkdir -p "$PGSOCKET"
 
 echo "[$(date)] Starting postgres..."
+# GT is exact -> every brute_knn/target_rank is an index-off SEQUENTIAL scan of
+# the whole keyframes heap. On the full v3c1+2+3 corpus (~4.1M keyframes) the
+# embedding column alone is ~13G, so with default shared_buffers (128M) each of
+# the dozens of per-query scans re-reads the heap from NFS and a single query
+# blows past the wall clock. Give postgres enough cache to keep the hot heap
+# resident after the first scan (fits under the 32G job memory above); the rest
+# then run in-memory. effective_cache_size just informs the planner.
 apptainer exec --bind /dev/shm --bind /tmp --bind "$PGSOCKET:$PGSOCKET" "$SIF" \
-    postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off &
+    postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off \
+    -c shared_buffers=16GB -c effective_cache_size=24GB -c work_mem=256MB &
 PG_PID=$!
 
 # Shut postgres down cleanly however this job ends -- scancel, an error under
