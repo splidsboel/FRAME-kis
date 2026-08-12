@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=frame_load
 #SBATCH --partition=cores_any
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32G
-#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=96G
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/frame_load_%j.out
 
 # Step 3 of [[Data pipeline and adapter load refactor]]: ingest a Tier-2 canonical
@@ -15,11 +15,24 @@
 #     sbatch load_dataset.sh --dataset data/canonical/v3c2 --force
 # Extra args pass straight through to scripts/load_dataset.py.
 #
-# Wall time is dominated by the HNSW build over ~1M vectors, not the COPY. 12h is
-# generous; the job is safe to re-run because load_data() skips tables whose row
-# counts already match.
+# Wall time is dominated by the HNSW build. For the UNION load (v3c1+2+3 =
+# ~4.1M 768-d vectors) this is severe: with the postgres-default maintenance_work_mem
+# (64MB) pgvector builds the graph on disk in tiny passes and does NOT finish in 12h
+# (job 102410 timed out there). We fix it two ways below:
+#   * maintenance_work_mem = 24GB  -> the whole graph (~13GB of vectors + links) fits
+#     in memory, so it's an in-memory build, not the on-disk crawl.
+#   * max_parallel_maintenance_workers = 8 -> pgvector builds HNSW in parallel.
+# Both are passed to the adapter via FRAME_* env vars (see _build_indexes); postgres
+# is started with matching server ceilings so the session can actually get workers.
+# The job is safe to re-run: load_datasets() skips the reload when the rows are
+# already present and resumes straight at the index build (only the HNSW was missing).
 
 set -euo pipefail
+
+# HNSW build tuning. maintenance_work_mem is a single shared budget for the build
+# (not per-worker); keep it well under --mem. Parallel workers <= cpus-per-task.
+export FRAME_MAINTENANCE_WORK_MEM="${FRAME_MAINTENANCE_WORK_MEM:-24GB}"
+export FRAME_INDEX_PARALLEL_WORKERS="${FRAME_INDEX_PARALLEL_WORKERS:-8}"
 
 # Admin-mandated in every job script; the postgres socket stays on node-local
 # /tmp because $HOME/tmp is NFS.
@@ -33,8 +46,14 @@ PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
 mkdir -p "$PGSOCKET"
 
 echo "[$(date)] Starting postgres..."
+# Raise the parallel-worker ceilings at the server level so the session's
+# max_parallel_maintenance_workers (set in _build_indexes) is actually honoured --
+# the defaults (max_worker_processes/max_parallel_workers = 8, maintenance = 2)
+# would silently cap the HNSW build back to 2 workers.
 apptainer exec --bind /dev/shm --bind /tmp --bind "$PGSOCKET:$PGSOCKET" "$SIF" \
-    postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off &
+    postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off \
+    -c max_worker_processes=20 -c max_parallel_workers=16 \
+    -c max_parallel_maintenance_workers=8 &
 PG_PID=$!
 
 # Shut postgres down cleanly however this job ends -- scancel, an error under

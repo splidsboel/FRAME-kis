@@ -26,6 +26,7 @@ Requires the `pgvector` extra (psycopg2). Connection via libpq env vars
 from __future__ import annotations
 
 import json
+import os
 from typing import Sequence
 
 import numpy as np
@@ -254,6 +255,21 @@ class PgvectorAdapter(VectorDBAdapter):
         assert self._conn is not None
         print("[load] building indexes (this is the slow part) ...", flush=True)
         with self._conn.cursor() as cur:
+            # HNSW build over the ~4.1M-vector union is the dominant cost. Two knobs
+            # decide whether it finishes in hours or days, both session-scoped:
+            #   * maintenance_work_mem — if the in-progress graph doesn't fit, pgvector
+            #     spills to an on-disk build that is dramatically slower. Size it to
+            #     hold the graph (comfortably under the job's --mem).
+            #   * max_parallel_maintenance_workers — pgvector builds HNSW in parallel;
+            #     the default (2) leaves most of an --cpus-per-task=N job idle.
+            # Both are read from env so the SLURM script owns the numbers alongside its
+            # --mem / --cpus request; the defaults keep a laptop run sane.
+            mwm = os.environ.get("FRAME_MAINTENANCE_WORK_MEM", "2GB")
+            workers = os.environ.get("FRAME_INDEX_PARALLEL_WORKERS", "0")
+            cur.execute(f"SET maintenance_work_mem = '{mwm}';")
+            cur.execute(f"SET max_parallel_maintenance_workers = {int(workers)};")
+            print(f"[load]   maintenance_work_mem={mwm}, "
+                  f"max_parallel_maintenance_workers={workers}", flush=True)
             for stmt in _INDEXES:
                 try:
                     cur.execute(stmt)
@@ -301,6 +317,15 @@ class PgvectorAdapter(VectorDBAdapter):
             print(f"[load] union already loaded: {have:,} keyframes across "
                   f"{len(datasets)} shards; skipping (use force to rebuild)", flush=True)
             return False
+        if not force and have == total_kf and total_kf > 0:
+            # All rows are present but the HNSW index is not — the exact state a
+            # load job left behind when it was killed mid-CREATE INDEX (the COPYs
+            # committed under autocommit; the final HNSW build rolled back). Resume
+            # by (re)building indexes ONLY: skip the multi-million-row reload, and
+            # let CREATE INDEX IF NOT EXISTS no-op the btrees that already survived.
+            print(f"[load] union rows present ({have:,}) but HNSW index missing; "
+                  "resuming at index build (no reload)", flush=True)
+            return True
         if have and not force:
             raise RuntimeError(
                 f"keyframes holds {have:,} rows but the union expects {total_kf:,}. "
