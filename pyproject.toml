@@ -11,11 +11,15 @@ dependencies = [
 # Optional paths keep the heavy toolchains off the light harness install.
 #   uv sync                      -> core harness only
 #   uv sync --extra pgvector     -> + psycopg2 (run against pgvector)
+#   uv sync --extra chroma       -> + chromadb (run against Chroma)
 #   uv sync --extra encode       -> + torch/transformers (shared SigLIP encoder)
 #   uv sync --extra oracle       -> + everything the HPC GT build needs
 #   uv sync --extra viz          -> + matplotlib (plots)
 [project.optional-dependencies]
 pgvector = ["psycopg2-binary>=2.9"]
+# 1.5.0 is the floor: array-valued metadata + the $contains/$not_contains operators
+# over arrays (how the denormalised label sets are filtered) landed there.
+chroma = ["chromadb>=1.5.0"]
 encode = ["torch>=2.1", "transformers>=4.40"]
 oracle = ["psycopg2-binary>=2.9", "torch>=2.1", "transformers>=4.40"]
 viz = ["matplotlib>=3.7"]

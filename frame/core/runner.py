@@ -93,7 +93,15 @@ class Runner:
         the query set being run, stamped into the results so they can later be shown
         comparable (or not) — see frame/core/version.py."""
         results: list[RawResult] = []
-        for item in items:
+        n = len(items)
+        for i, item in enumerate(items, 1):
+            # Progress line per item: a long run used to stall silently (the summary
+            # only prints at the very end), so a runaway query was invisible until the
+            # wall-clock limit killed the job. Print start + per-item wall time,
+            # flushed, so the log shows exactly which query is slow.
+            t_item = perf_counter()
+            print(f"[run] {i}/{n} {item.query_id}  filters={len(item.filters)} ...",
+                  flush=True)
             ids: dict[str, list[str]] = {}
             latency: dict[str, float] = {}
             # One encode per DISTINCT text, reused by that text's two cells, so the
@@ -114,6 +122,9 @@ class Runner:
 
             results.append(RawResult(query_id=item.query_id, ids=ids,
                                      latency_ms=latency))
+            lat = "  ".join(f"{name}={ms:.0f}ms" for name, ms in latency.items())
+            print(f"[run] {i}/{n} {item.query_id}  done in "
+                  f"{perf_counter() - t_item:.1f}s  ({lat})", flush=True)
         return RawResults(system=self.adapter.name, k=k, results=results,
                           benchmark=benchmark, harness_contract=HARNESS_CONTRACT)
 

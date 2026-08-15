@@ -15,7 +15,7 @@ import argparse
 import os
 
 from frame import Analyzer, Runner
-from frame.adapters import PgvectorAdapter
+from frame.adapters import ChromaAdapter, PgvectorAdapter
 from frame.core.encode import CachingEncoder, SiglipEncoder
 from frame.core.schema import PRIMARY_FILTERED, load_benchmark
 
@@ -24,7 +24,7 @@ DATA = os.path.join(HERE, "data")
 
 ADAPTERS = {
     "pgvector": PgvectorAdapter,
-    # "chroma": ChromaAdapter,   # later
+    "chroma": ChromaAdapter,   # denormalised single-collection (no JOINs)
     # "milvus": MilvusAdapter,   # later
 }
 

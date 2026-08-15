@@ -32,12 +32,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from frame.adapters import PgvectorAdapter
+from frame.adapters import ChromaAdapter, PgvectorAdapter
 from frame.core.dataset import Dataset
 
 ADAPTERS = {
     "pgvector": PgvectorAdapter,
-    # "chroma": ChromaAdapter,   # later — same call, different physical layout
+    "chroma": ChromaAdapter,   # denormalised single-collection load (same call)
     # "milvus": MilvusAdapter,
 }
 

@@ -59,6 +59,7 @@ Requires [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync                                    # core harness only
 uv sync --extra pgvector --extra encode    # to run against pgvector
+uv sync --extra chroma   --extra encode    # to run against Chroma
 
 # 1. compile the authored query set -> data/benchmark.jsonl
 uv run python queryset/build.py
@@ -121,7 +122,7 @@ are reused unchanged, so every system is measured the same way.
 ```
 frame/                     harness package
   core/    schema · dataset (Tier-2 handle) · adapter (ABC) · runner · analyzer · encode
-  adapters/  pgvector · (add your own)
+  adapters/  pgvector (normalized, JOINs) · chroma (denormalized, one collection)
 queryset/                  authored query set (source of truth) + build.py
   queries/*.json
 oracle/                    build_gt.py — exact ground-truth computation
