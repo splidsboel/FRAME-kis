@@ -34,6 +34,7 @@ are stable across trials (deterministic given a fixed ef_search).
 
 from __future__ import annotations
 
+import json
 from statistics import median
 from time import perf_counter
 from typing import Sequence
@@ -88,10 +89,36 @@ class Runner:
         self.repeat = max(1, repeat)
 
     def run(self, items: Sequence[QueryItem], k: int = DEFAULT_K,
-            benchmark: "BenchmarkVersion | None" = None) -> RawResults:
+            benchmark: "BenchmarkVersion | None" = None,
+            progress_path: "str | None" = None) -> RawResults:
         """Run every condition for every item. `benchmark` is the version marker of
         the query set being run, stamped into the results so they can later be shown
-        comparable (or not) — see frame/core/version.py."""
+        comparable (or not) — see frame/core/version.py.
+
+        If `progress_path` is given, each item's result is flushed to that JSONL file
+        the moment it completes, so a wall-clock kill (SLURM time limit) keeps every
+        query already finished instead of losing the whole run — results were
+        otherwise only written after all N items. The streamed file is byte-identical
+        to RawResults.write_jsonl (same header + rows) so it reads back with
+        RawResults.read_jsonl unchanged, whether the run finished or was cut short."""
+        sink = None
+        if progress_path is not None:
+            sink = open(progress_path, "w")
+            header: dict = {"system": self.adapter.name, "k": k,
+                            "harness_contract": HARNESS_CONTRACT}
+            if benchmark is not None:
+                header["benchmark"] = benchmark.to_dict()
+            sink.write(json.dumps(header) + "\n")
+            sink.flush()
+        try:
+            results = self._run_items(items, k, sink)
+        finally:
+            if sink is not None:
+                sink.close()
+        return RawResults(system=self.adapter.name, k=k, results=results,
+                          benchmark=benchmark, harness_contract=HARNESS_CONTRACT)
+
+    def _run_items(self, items, k, sink):
         results: list[RawResult] = []
         n = len(items)
         for i, item in enumerate(items, 1):
@@ -120,13 +147,18 @@ class Runner:
                 ids[cond.name] = ranked
                 latency[cond.name] = ms
 
-            results.append(RawResult(query_id=item.query_id, ids=ids,
-                                     latency_ms=latency))
+            result = RawResult(query_id=item.query_id, ids=ids, latency_ms=latency)
+            results.append(result)
+            if sink is not None:
+                # Flush per item so a killed job keeps this query. flush() hands the
+                # bytes to the OS, which survives the process being torn down; the
+                # next job's Analyzer can read the partial file as-is.
+                sink.write(json.dumps(result.to_dict()) + "\n")
+                sink.flush()
             lat = "  ".join(f"{name}={ms:.0f}ms" for name, ms in latency.items())
             print(f"[run] {i}/{n} {item.query_id}  done in "
                   f"{perf_counter() - t_item:.1f}s  ({lat})", flush=True)
-        return RawResults(system=self.adapter.name, k=k, results=results,
-                          benchmark=benchmark, harness_contract=HARNESS_CONTRACT)
+        return results
 
     def _timed_search(
         self, vec, filters: Sequence[Predicate], k: int

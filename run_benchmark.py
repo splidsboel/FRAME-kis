@@ -65,12 +65,17 @@ def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
     """
     analyzer = Analyzer(score_harm_exemplars=(exemplars == "include"))
     adapter = ADAPTERS[system](**adapter_kwargs)
-    with adapter:
-        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(
-            qs.items, k=k, benchmark=qs.version)
 
+    # Stream results to raw_path AS the run proceeds, so a wall-clock kill (SLURM
+    # time limit) on a long run keeps every query already finished. The final
+    # write_jsonl below is the canonical complete write; on success it just rewrites
+    # the same bytes, and on a kill the streamed partial file is left analysable.
     suffix = f".{label}" if label else ""
     raw_path = os.path.join(DATA, f"raw_results.{system}{suffix}.jsonl")
+    with adapter:
+        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(
+            qs.items, k=k, benchmark=qs.version, progress_path=raw_path)
+
     raw.write_jsonl(raw_path)
     metrics = analyzer.analyze(raw, qs.items, benchmark=qs.version,
                                allow_mismatch=allow_mismatch)

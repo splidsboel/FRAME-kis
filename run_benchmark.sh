@@ -3,7 +3,7 @@
 #SBATCH --partition=cores_any
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/frame_run_%j.out
 
 # Run a system end-to-end and score it. Reads the GT-enriched data/benchmark.jsonl
