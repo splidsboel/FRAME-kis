@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=frame_run
-#SBATCH --partition=cores_any
+# Whole node to ourselves, on a GPU-FREE node. Latency is a headline output of this
+# benchmark and shared-node co-tenancy inflates it (the 2026-08-16 chroma run shared
+# cn5 with an 8-core RL job; q0005's ~2x blip is most likely that). But `--exclusive`
+# on the GPU partitions (cores_any / cores' GPU nodes) grabs the node's GPUs too and
+# is rejected by QOS (MaxGRESPerJob). So we target the GPU-free `cores` nodes cn14/
+# cn15 (exclude cn8: its 256 cores trip a CPU cap). Trade-off: waits for one to free.
+#SBATCH --partition=cores
+#SBATCH --exclude=cn8,cn16,cn17,cn18
+#SBATCH --exclusive
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/frame_run_%j.out
-# Whole node to ourselves. Latency is a headline output of this benchmark, and
-# cores_any co-tenancy demonstrably inflates it: shared NFS + memory bandwidth with
-# other users' jobs (the 2026-08-16 chroma run shared cn5 with an 8-core RL job, and
-# q0005's ~2x latency blip is most likely that contention). Recall/MRR don't need
-# isolation, but trustworthy timings do. Trade-off: longer queue wait for a free node.
-#SBATCH --exclusive
 
 # Run a system end-to-end and score it. Reads the GT-enriched data/benchmark.jsonl
 # produced by build_gt.sh (run that FIRST) and the conda `embeddings` env (torch/
