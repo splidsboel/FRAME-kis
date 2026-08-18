@@ -68,6 +68,17 @@ if [ "$SYSTEM" = "pgvector" ]; then
     PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
     mkdir -p "$PGSOCKET"
 
+    # Fail FAST if apptainer can't run a container here -- BEFORE the 66GB staging copy,
+    # so we never copy to a node that can't start postgres anyway. Two acltr failure modes
+    # seen 2026-08-18: cn12 has no apptainer; cn4 had user namespaces exhausted. A bare
+    # `command -v` misses the second, so runtime-test with a throwaway exec (~2s vs the
+    # 300s pg_isready timeout the silent background failure would otherwise cost).
+    if ! apptainer exec "$SIF" true >/dev/null 2>&1; then
+        echo "[$(date)] FATAL: apptainer cannot run a container on $(hostname) " \
+             "(missing, or user namespaces exhausted) -- exclude this node and resubmit." >&2
+        exit 1
+    fi
+
     # ── Stage PGDATA onto NODE-LOCAL disk (the latency fix) ──────────────────────────
     # /home is NFS over 44x 16TB SATA RAID10; HNSW graph traversal is RANDOM 8KB reads,
     # which crawl at ~1-2 MB/s there when the 16GB index doesn't fit in RAM (measured:

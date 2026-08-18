@@ -38,13 +38,17 @@ PGDATA="$HOME/pgdata"
 PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
 mkdir -p "$PGSOCKET"
 
-# Fail FAST if this node lacks apptainer (some acltr nodes do -- cn12). Without this
-# the missing-apptainer postgres start dies silently in the background and we only
-# find out after the 300s pg_isready loop times out. A clear message in 1s beats that.
-command -v apptainer >/dev/null 2>&1 || {
-    echo "[$(date)] FATAL: apptainer not found on $(hostname) -- exclude this node (see #SBATCH --exclude)." >&2
+# Fail FAST if apptainer can't actually RUN a container on this node. Two real acltr
+# failure modes seen 2026-08-18: cn12 has no apptainer at all (command not found), and
+# cn4 had its user namespaces exhausted ("maximum number of user namespaces exceeded").
+# A bare `command -v` misses the second -- so RUNTIME-test with a throwaway exec. Without
+# this the failed postgres start dies silently in the background and we only find out
+# after the 300s pg_isready loop times out; a clear message in ~2s beats that.
+if ! apptainer exec "$SIF" true >/dev/null 2>&1; then
+    echo "[$(date)] FATAL: apptainer cannot run a container on $(hostname)." >&2
+    echo "  Missing apptainer, or user namespaces exhausted -- exclude this node and resubmit." >&2
     exit 1
-}
+fi
 
 echo "[$(date)] Starting postgres..."
 # GT is exact -> every brute_knn/target_rank is an index-off SEQUENTIAL scan of
