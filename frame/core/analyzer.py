@@ -35,12 +35,15 @@ from typing import Sequence
 
 from .schema import (
     CONDITIONS,
+    SUCCEEDING_CAP,
+    VARIANT_CONDS,
     GroundTruth,
     Metrics,
     QueryItem,
     QueryMetrics,
     RawResult,
     RawResults,
+    VariantMetric,
 )
 from .version import HARNESS_CONTRACT, BenchmarkVersion, Compatibility, compare
 
@@ -129,9 +132,13 @@ DEFAULT_MRR_CAPS = (1000, 100, 50, 10)
 class Analyzer:
     def __init__(self, ks: Sequence[int] = DEFAULT_KS,
                  mrr_caps: Sequence[int] = DEFAULT_MRR_CAPS,
-                 score_harm_exemplars: bool = False):
+                 score_harm_exemplars: bool = False,
+                 variant_succeeding_cap: int = SUCCEEDING_CAP):
         self.ks = tuple(ks)
         self.mrr_caps = tuple(mrr_caps)
+        # Rank within which a phrasing must find the target UNFILTERED to count as
+        # "succeeding" — the gate for the succeeding-only MRR (schema.SUCCEEDING_CAP).
+        self.variant_succeeding_cap = variant_succeeding_cap
         # When True, the filter cells of a harm exemplar (target excluded by its own
         # filter) are scored anyway — recall counts, the target rank is a miss —
         # instead of being marked unscorable. This is the `--exemplars include`
@@ -196,6 +203,18 @@ class Analyzer:
                 recall[cond.name][k] = _recall_at_k(ids, gt.gt_for(cond), k)
             rank[cond.name] = _first_rank(ids, targets)
 
+        # Per-phrasing scores (present only when the run graded variants). Task
+        # success only: the target's rank in each phrasing's ranking, per
+        # VARIANT_CONDS. No Recall — there is no per-phrasing exact GT to score
+        # against. Ranks are None when the item has no target ids (no GT yet).
+        variant_metrics = [
+            VariantMetric(
+                index=v.index, team=v.team, action=v.action, text=v.text,
+                target_rank={c: _first_rank(ids, targets) for c, ids in v.ids.items()},
+            )
+            for v in r.variants
+        ]
+
         return QueryMetrics(
             query_id=r.query_id,
             scorable=scorable,
@@ -204,6 +223,7 @@ class Analyzer:
             latency_ms=dict(r.latency_ms),
             selectivity=gt.filter_selectivity_conjunction if gt else None,
             harm_exemplar=gt.is_harm_exemplar if gt else False,
+            variants=variant_metrics,
         )
 
     def headline_cap(self, m: Metrics) -> int | None:
@@ -309,6 +329,53 @@ class Analyzer:
             filt = "scored (target = miss)" if q.is_scorable("semantic+filter") \
                 else "dropped (target fails filter)"
             out.append(f"{q.query_id:>6} | {sel:>7} | {rr:>10} | {sr:>10} | {filt}")
+        return "\n".join(out)
+
+    # ── per-variant reporting (the "grade every phrasing" facet) ────────────────
+    def variant_summary(self, m: Metrics) -> str:
+        """Task success over the REAL user phrasings (Omar, 2026-08-18): MRR over
+        ALL phrasings beside MRR over the SUCCEEDING-only subset (those whose target
+        the no-filter search finds within the succeeding cap). The split separates a
+        weak/vague wording from a filter-or-system effect — without it a task full of
+        hopeless phrasings just reads as a system failure. Empty when the run graded
+        no variants."""
+        if not m.has_variants():
+            return ""
+        cap = self.headline_cap(m)
+        clabel = f"@{cap}" if cap else " (uncapped)"
+        sc = self.variant_succeeding_cap
+        rows = m.variant_rows()
+        n = len(rows)
+        n_tasks = sum(1 for q in m.per_query if q.variants)
+        n_succ = m.variant_n(succeeding_cap=sc)
+        has_filter = any("filter" in v.target_rank for v in rows)
+
+        out = ["", "=" * 66,
+               f"Per-phrasing grading — {n} real user phrasings across {n_tasks} task(s)",
+               "=" * 66,
+               f"MRR{clabel}: ALL phrasings vs SUCCEEDING-only (target in no-filter "
+               f"top-{sc}) — {n_succ}/{n} phrasings succeed",
+               f"{'cond':<10} | {'MRR all':>9} | {'MRR succ':>9}",
+               "-" * 34]
+        for cond in VARIANT_CONDS:
+            if cond == "filter" and not has_filter:
+                continue
+            out.append(f"{cond:<10} | {m.variant_mrr(cond, cap):>9.3f} | "
+                       f"{m.variant_mrr(cond, cap, succeeding_cap=sc):>9.3f}")
+
+        out += ["", f"per task (nofilter MRR{clabel})",
+                f"{'qid':>6} | {'n':>3} | {'succ':>4} | {'MRR all':>9} | {'MRR succ':>9}",
+                "-" * 44]
+        by_all = m.variant_mrr_by_task("nofilter", cap)
+        by_succ = m.variant_mrr_by_task("nofilter", cap, succeeding_cap=sc)
+        for q in m.per_query:
+            if not q.variants:
+                continue
+            ns = sum(1 for v in q.variants if v.succeeds(sc))
+            s = by_succ.get(q.query_id)
+            out.append(f"{q.query_id:>6} | {len(q.variants):>3} | {ns:>4} | "
+                       f"{by_all.get(q.query_id, 0.0):>9.3f} | "
+                       f"{(f'{s:.3f}' if s is not None else 'n/a'):>9}")
         return "\n".join(out)
 
     def _grid(self, m: Metrics) -> list[str]:

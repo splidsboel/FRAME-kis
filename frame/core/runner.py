@@ -41,7 +41,7 @@ from typing import Sequence
 
 from .adapter import VectorDBAdapter
 from .encode import Encoder
-from .schema import CONDITIONS, Predicate, QueryItem, RawResult, RawResults
+from .schema import CONDITIONS, Predicate, QueryItem, RawResult, RawResults, VariantResult
 from .version import HARNESS_CONTRACT, BenchmarkVersion  # noqa: F401  (annotation)
 
 DEFAULT_K = 1000
@@ -82,11 +82,17 @@ class Runner:
         encoder: Encoder,
         warmup: int = DEFAULT_WARMUP,
         repeat: int = DEFAULT_REPEAT,
+        grade_variants: bool = False,
     ):
         self.adapter = adapter
         self.encoder = encoder
         self.warmup = max(0, warmup)
         self.repeat = max(1, repeat)
+        # Opt-in: also run every real human phrasing of each item as its own query
+        # (schema.VariantResult). Off by default — the extra searches are non-trivial
+        # (a filtered phrasing pays the same filter cost as a 2x2 filter cell), and a
+        # plain run's results file is then byte-identical to before.
+        self.grade_variants = grade_variants
 
     def run(self, items: Sequence[QueryItem], k: int = DEFAULT_K,
             benchmark: "BenchmarkVersion | None" = None,
@@ -147,7 +153,10 @@ class Runner:
                 ids[cond.name] = ranked
                 latency[cond.name] = ms
 
-            result = RawResult(query_id=item.query_id, ids=ids, latency_ms=latency)
+            variants = self._grade_variants(item, k) if self.grade_variants else []
+
+            result = RawResult(query_id=item.query_id, ids=ids, latency_ms=latency,
+                               variants=variants)
             results.append(result)
             if sink is not None:
                 # Flush per item so a killed job keeps this query. flush() hands the
@@ -156,9 +165,32 @@ class Runner:
                 sink.write(json.dumps(result.to_dict()) + "\n")
                 sink.flush()
             lat = "  ".join(f"{name}={ms:.0f}ms" for name, ms in latency.items())
+            nvar = f"  +{len(variants)} variants" if variants else ""
             print(f"[run] {i}/{n} {item.query_id}  done in "
-                  f"{perf_counter() - t_item:.1f}s  ({lat})", flush=True)
+                  f"{perf_counter() - t_item:.1f}s  ({lat}){nvar}", flush=True)
         return results
+
+    def _grade_variants(self, item: QueryItem, k: int) -> list[VariantResult]:
+        """Run each real human phrasing of `item` as its own query: "nofilter"
+        always, and "filter" too when the item carries a predicate (the task's
+        SHARED filter — the filter is task-level, so this is the same predicate under
+        many wordings, not a new filter measurement).
+
+        A SINGLE search per (phrasing, cond), no warmup/repeat: variants are scored on
+        target RANK, which is deterministic given a fixed ef_search, so there is
+        nothing to average — and this is the semantic axis, not the latency headline,
+        which the 2x2 cells own. The shared CachingEncoder means a phrasing repeated
+        across systems is embedded once."""
+        out: list[VariantResult] = []
+        for vi, var in enumerate(item.user_query_variants):
+            text = var.get("text", "")
+            vec = self.encoder.encode(text)
+            ids: dict[str, list[str]] = {"nofilter": self.adapter.search(vec, [], k)}
+            if item.filters:
+                ids["filter"] = self.adapter.search(vec, item.filters, k)
+            out.append(VariantResult(index=vi, team=var.get("team", ""),
+                                     action=var.get("action", ""), text=text, ids=ids))
+        return out
 
     def _timed_search(
         self, vec, filters: Sequence[Predicate], k: int

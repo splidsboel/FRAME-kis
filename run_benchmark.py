@@ -55,13 +55,16 @@ PG_ITERATIVE_MODES = ("off", "relaxed_order", "strict_order")
 
 
 def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
-                  allow_mismatch=False, exemplars="isolate"):
+                  allow_mismatch=False, exemplars="isolate", grade_variants=False):
     """One full run for one adapter configuration; writes tagged artifacts, returns Metrics.
 
     `exemplars` controls how the filter-harm exemplars (target excluded by its own
     filter) are treated: 'isolate' (default) keeps them out of the headline but
     reports them separately; 'exclude' keeps them out with only a count note;
     'include' folds them into the headline aggregate too.
+
+    `grade_variants` additionally runs every real human phrasing of each item as its
+    own query (task-success MRR over real wordings — Omar, 2026-08-18).
     """
     analyzer = Analyzer(score_harm_exemplars=(exemplars == "include"))
     adapter = ADAPTERS[system](**adapter_kwargs)
@@ -73,7 +76,8 @@ def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
     suffix = f".{label}" if label else ""
     raw_path = os.path.join(DATA, f"raw_results.{system}{suffix}.jsonl")
     with adapter:
-        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat).run(
+        raw = Runner(adapter, encoder, warmup=warmup, repeat=repeat,
+                     grade_variants=grade_variants).run(
             qs.items, k=k, benchmark=qs.version, progress_path=raw_path)
 
     raw.write_jsonl(raw_path)
@@ -96,6 +100,10 @@ def run_and_score(system, encoder, qs, k, warmup, repeat, adapter_kwargs, label,
         print(f"\n[note] {n_exemplars} filter-harm exemplar(s) excluded from the "
               f"headline (target excluded by its own filter); --exemplars isolate to "
               f"see them")
+    # Per-phrasing task success (only when --grade-variants ran).
+    variants = analyzer.variant_summary(metrics)
+    if variants:
+        print(variants)
     print()
     print(f"raw     -> {os.path.relpath(raw_path, HERE)}")
     print(f"metrics -> {os.path.relpath(metrics_path, HERE)}")
@@ -143,6 +151,11 @@ def main():
                          "its own filter): 'isolate' keeps them out of the headline "
                          "but reports them separately (default); 'exclude' just notes "
                          "the count; 'include' also folds them into the headline")
+    ap.add_argument("--grade-variants", action="store_true",
+                    help="also run every real human phrasing of each item as its own "
+                         "query (task-success MRR over real wordings, all vs "
+                         "succeeding-only). Adds searches — a filtered phrasing costs "
+                         "as much as a 2x2 filter cell, so this is off by default")
     ap.add_argument("--explain", metavar="QID",
                     help="diagnostic: EXPLAIN the filtered search for one query "
                          "under iterative_scan off vs relaxed_order, then exit")
@@ -182,7 +195,7 @@ def main():
         results_by_mode[mode] = run_and_score(
             args.system, encoder, qs, args.k,
             args.warmup, args.repeat, adapter_kwargs, label, args.allow_mismatch,
-            exemplars=args.exemplars)
+            exemplars=args.exemplars, grade_variants=args.grade_variants)
 
     if len(modes) > 1:
         print_sweep_comparison(results_by_mode, args.k)
