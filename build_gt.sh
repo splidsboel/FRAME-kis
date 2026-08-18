@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=build_gt
 #SBATCH --partition=acltr
+#SBATCH --exclude=cn12   # cn12 (acltr) has NO apptainer -> postgres can't start (job 104538, 2026-08-18)
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
@@ -36,6 +37,14 @@ SIF="$HOME/containers/pgvector-pg16.sif"
 PGDATA="$HOME/pgdata"
 PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
 mkdir -p "$PGSOCKET"
+
+# Fail FAST if this node lacks apptainer (some acltr nodes do -- cn12). Without this
+# the missing-apptainer postgres start dies silently in the background and we only
+# find out after the 300s pg_isready loop times out. A clear message in 1s beats that.
+command -v apptainer >/dev/null 2>&1 || {
+    echo "[$(date)] FATAL: apptainer not found on $(hostname) -- exclude this node (see #SBATCH --exclude)." >&2
+    exit 1
+}
 
 echo "[$(date)] Starting postgres..."
 # GT is exact -> every brute_knn/target_rank is an index-off SEQUENTIAL scan of
