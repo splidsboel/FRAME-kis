@@ -1,0 +1,171 @@
+{
+  "query_id": "q0041",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kist-11",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "A time lapse evening/night shot over the sea, with a breakwater (mole, jetty) visible in the lower left, and the moon is rising. Two brightly lit ships are visible in the distance in the left half of the screen until the camera pans slightly to the right. The frame is blueish, with the moon coming out behind clouds.",
+  "decomposition": {
+    "vector_query": "time lapse evening night shot with a breakwater mole jetty in the lower left and the moon rising, two brightly lit ships in the distance, a bluish frame with the moon coming out behind clouds",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "ocean",
+          "coast",
+          "islet"
+        ],
+        "vocab": "places365",
+        "mapping_source": "author_probe",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "07551",
+    "start_s": 34.2,
+    "end_s": 38.55
+  },
+  "user_query_variants": [
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "moon rising time lapse"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a night shot over the sea with a breakwater on the left and a rising moon"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "sea moon is rising and breakwater in lower left"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "night shot over sea with breakwater and rising moon"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A time lapse evening night shot over the sea, with breakwater (mole, jetty) visible and the moon is rising"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "time lapse night shot over sea with breakwater and rising moon"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A time lapse evening night shot over the sea, with mole breakwater visible and the moon is rising"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "moon rising breakwater"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A time lapse evening night shot over the sea, with mole breakwater visible and the moon is rising, two brightly lit ships are visible in the distance"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a night shot over the sea with a breakwater on the left and a rising moon. two ships are visible in the disstance"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a night shot over the sea with a breakwater on the left and a rising moon. two ships are visible in the distance"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "evening shot over sea with breakwater and rising moon and two bright ships"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "night shot over the sea, with breakwater visible and the moon is rising, two brightly lit ships are visible in the distance"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "night water with jetty two ships"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "two brightly lit ships over the sea at night. moon is rising and there is a breakwater on the left"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "night water with jetty two ships brightly lit"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "night water with jetty two ships brightly lit, moon behind clouds"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "night shot over the sea, with breakwater visible and the moon is rising, two brightly lit ships are visible in the distance, moon coming from behind clouds"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a evening shot over the sea with a breakwater visible in the lower left and the moon is rising. the frame is blueish"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "two brightly lit ships in the night at the sea. moon is visible. frame is blueish"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "blue evening shot of breakwater and two shining ships on sea"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "blue evening shot of breakwater, moon coming from behind clouds and two shining ships on sea"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "two brightly lit ships in the night at the sea. moon is visible. moon coming out behind clouds"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "two bright ships in dark water, moon behind clouds"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "breakwater in the lower left and the moon is rising, two brightly lit ships are visible in the distance, moon coming from behind clouds"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "two bright ships in dark water, moon behind clouds, jetty"
+    }
+  ],
+  "notes": "VBS2026 Textual-KIS task t11, 26 real user formulations for V3C2 target 07551. raw_query_text = authored official hint. SCENE filter on the 'over the sea' setting: probe shows target passes on scene 'ocean' 0.463 (6/9 kf), 'islet' 0.323 (6/9), 'coast' 0.155 (5/9) at t_scene>=0.10. The salient OBJECTS the users named are mostly undetected -- 'moon' absent, 'breakwater/mole/jetty' absent; only 'ship' 0.422 (3/9) present -- so an object filter is both sparse and would exclude on moon/breakwater. Scene 'over the sea' is the robust filterable attribute. author_probe labels, oracle-pending (status=draft)."
+}

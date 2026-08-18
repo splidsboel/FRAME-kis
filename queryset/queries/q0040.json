@@ -1,0 +1,115 @@
+{
+  "query_id": "q0040",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kis-t10",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "Multiple time lapse sequences of people putting items on a table at a market stand (booth). There is a table with a white cloth, under a red tent. A second stand (booth) with a different setup is shown in between. The items include notebooks and postcards.",
+  "decomposition": {
+    "vector_query": "time lapse of people putting items on a market stand booth with a white cloth under a red tent, the items include notebooks and postcards",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "table",
+          "desk"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "author_probe",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "07602",
+    "start_s": 225.06,
+    "end_s": 232.58
+  },
+  "user_query_variants": [
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "people putting items on a table on market stand"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "putting items on table at market stand"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "people putting items on a table at a market stand"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "time lapse people putting items on a table on market stand"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "market stand people putting items"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "People putting items on a table at a market snad"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "people putting imes on a table at a market stand booth"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "People putting items on a table at a market stand"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "time lapse of people putting items on a table on market stand"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "people putting items on a table at a market booth. there is a table with a white cloth under a red tent"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "putting items on table at market stand. table with white cloth under red tent"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "people putting imes on a table at a market stand booth white cloth under red tent"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "people putting items on a table  with white cloth under a red tent on market stand"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "People putting items on a table at a market stand there is a table with a white cloth under a red tent"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "people putting postcards and notebooks on a table  with white cloth under a red tent on market stand"
+    }
+  ],
+  "notes": "VBS2026 Textual-KIS task t10, 15 real user formulations for V3C2 target 07602. raw_query_text = authored official hint. OBJECT filter chosen over scene: probe (job 104515) shows the users' perceived 'market stand' scene was NOT what Places365 saw (target scenes = art_school 0.52 / playroom 0.51, no market), so a scene filter on 'market' would exclude the target -- a user<->detector divergence finding. The query object 'table' IS present: target passes on obj 'desk' 0.490 (12/20 kf) and 'table' 0.472 (5/20) at t_object>=0.30; {table,desk} = the market-stall surface. tent detected only 1/20 (dropped). author_probe labels, not yet oracle-verified (status=draft)."
+}
