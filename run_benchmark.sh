@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=frame_run
-# Whole node to ourselves, on a GPU-FREE node. Latency is a headline output of this
-# benchmark and shared-node co-tenancy inflates it (the 2026-08-16 chroma run shared
-# cn5 with an 8-core RL job; q0005's ~2x blip is most likely that). But `--exclusive`
-# on the GPU partitions (cores_any / cores' GPU nodes) grabs the node's GPUs too and
-# is rejected by QOS (MaxGRESPerJob). So we target the GPU-free `cores` nodes cn14/
-# cn15 (exclude cn8: its 256 cores trip a CPU cap). Trade-off: waits for one to free.
-#SBATCH --partition=cores
-#SBATCH --exclude=cn8,cn16,cn17,cn18
-#SBATCH --exclusive
+# NODE TARGETING (updated 2026-08-18). The pgvector path now STAGES PGDATA onto
+# node-local /scratch to escape the NFS random-read latency that made filtered searches
+# take 100-700 s (see the staging block below + Thesis/HPC 'pgvector on hpc guide' ->
+# node-local staging). /scratch is only USER-WRITABLE on the big Infiniband nodes --
+# confirmed cn3 and cn6 (2.3 TB each, 100 Gbps IB, 192/384 GB RAM). The smaller nodes
+# (cn14/15/16...) have a root-owned /scratch and a ~50 GB /tmp, too small for the ~67 GB
+# DB. So we pin to cn3/cn6 via cores_any + an exclude list. We do NOT use --exclusive:
+# cn3/cn6 are GPU nodes and bare --exclusive grabs their GPUs (rejected by QOS
+# MaxGRESPerJob). Acceptable trade -- local-disk staging removes the NFS I/O noise that
+# --exclusive used to guard against; residual CPU/mem-bandwidth co-tenancy is minor, and
+# IB gives the fastest one-time staging copy. Set FRAME_STAGE_PGDATA=0 to run straight
+# off NFS (then any node schedules, but filtered latency is NOT quotable -- the reason
+# staging exists). Chroma ignores staging (its persist dir is separate) but still
+# benefits from the IB nodes' faster NFS.
+#SBATCH --partition=cores_any
+#SBATCH --exclude=cn4,cn5,cn7,cn12,cn16,cn17,cn18   # within cores_any -> leaves cn3,cn6
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --mem=48G
 #SBATCH --time=24:00:00
 #SBATCH --output=logs/frame_run_%j.out
 
@@ -57,26 +64,88 @@ echo "[$(date)] system under test: $SYSTEM"
 started_pg=0
 if [ "$SYSTEM" = "pgvector" ]; then
     SIF="$HOME/containers/pgvector-pg16.sif"
-    PGDATA="$HOME/pgdata"
+    CANON_PGDATA="$HOME/pgdata"        # canonical DB (NFS, source of truth; loaded once)
     PGSOCKET="/tmp/pg_${SLURM_JOB_ID:-$$}"
     mkdir -p "$PGSOCKET"
 
+    # ── Stage PGDATA onto NODE-LOCAL disk (the latency fix) ──────────────────────────
+    # /home is NFS over 44x 16TB SATA RAID10; HNSW graph traversal is RANDOM 8KB reads,
+    # which crawl at ~1-2 MB/s there when the 16GB index doesn't fit in RAM (measured:
+    # a filtered search was ~99.6% NFS I/O wait). Node-local /scratch (documented ~1TB,
+    # see Thesis/HPC/hpc3-access.md) avoids that entirely. The copy is a ONE-TIME
+    # SEQUENTIAL read (fast over IB); every query then does node-local I/O. All benchmark
+    # writes (ANALYZE stats etc.) land in the disposable local copy, so the canonical NFS
+    # pgdata stays pristine. Opt out with FRAME_STAGE_PGDATA=0 (runs straight off NFS).
+    LOCAL_PGDATA=""                    # empty => not staged => nothing to remove later
+    if [ "${FRAME_STAGE_PGDATA:-1}" = "1" ]; then
+        STAGE_BASE=""
+        for base in "/scratch/$USER" "/tmp/$USER"; do
+            if mkdir -p "$base" 2>/dev/null && [ -w "$base" ]; then STAGE_BASE="$base"; break; fi
+        done
+        : "${STAGE_BASE:=/tmp/$USER}"
+        # Reap OUR OWN orphaned stagings from jobs that were HARD-killed (a SIGKILL can't
+        # run the cleanup trap below). A staging dir whose job id is no longer in the
+        # queue is safe to delete -- this is what keeps node-local disk from filling up.
+        for d in "$STAGE_BASE"/frame_pgdata_*; do
+            [ -d "$d" ] || continue
+            jid="${d##*_}"
+            if [ -z "$(squeue -h -j "$jid" -o %i 2>/dev/null)" ]; then
+                echo "[$(date)] reaping orphan staging $d (job $jid not in queue)"; rm -rf "$d"
+            fi
+        done
+        LOCAL_PGDATA="$STAGE_BASE/frame_pgdata_${SLURM_JOB_ID:-$$}"
+        need_kb=$(du -sk "$CANON_PGDATA" | awk '{print $1}')
+        free_kb=$(df -Pk "$STAGE_BASE" | awk 'NR==2{print $4}')
+        echo "[$(date)] staging PGDATA $CANON_PGDATA -> $LOCAL_PGDATA "\
+"(need $((need_kb/1048576))G, free $((free_kb/1048576))G on $STAGE_BASE)"
+        if [ "$free_kb" -lt "$((need_kb + need_kb/10))" ]; then
+            echo "[$(date)] FATAL: not enough node-local space to stage PGDATA." >&2; exit 1
+        fi
+        rm -rf "$LOCAL_PGDATA"
+        cp -a "$CANON_PGDATA" "$LOCAL_PGDATA"
+        rm -f "$LOCAL_PGDATA/postmaster.pid"   # never carry a stale lock into the copy
+        chmod 700 "$LOCAL_PGDATA"
+        PGDATA="$LOCAL_PGDATA"
+        echo "[$(date)] staged to node-local disk."
+    else
+        PGDATA="$CANON_PGDATA"
+        echo "[$(date)] FRAME_STAGE_PGDATA=0 -> running straight off NFS $PGDATA"
+    fi
+
+    # Apptainer only auto-binds $HOME, /tmp, /dev/shm, /proc, /sys and cwd. If PGDATA now
+    # lives on node-local /scratch, the container CANNOT SEE it unless we bind it in --
+    # postgres then fails with 'could not access directory ... No such file' (observed
+    # job 104521). Bind the staging base for /scratch; empty otherwise ($HOME and /tmp
+    # are already auto-bound, so the NFS and /tmp-fallback paths need nothing extra).
+    STAGE_BIND=()
+    case "$PGDATA" in
+        /scratch/*) STAGE_BIND=(--bind "$(dirname "$PGDATA")") ;;
+    esac
+
     echo "[$(date)] Starting postgres..."
-    apptainer exec --bind /dev/shm --bind /tmp --bind "$PGSOCKET:$PGSOCKET" "$SIF" \
+    apptainer exec --bind /dev/shm --bind /tmp ${STAGE_BIND[@]+"${STAGE_BIND[@]}"} --bind "$PGSOCKET:$PGSOCKET" "$SIF" \
         postgres -D "$PGDATA" -k "$PGSOCKET" -c listen_addresses='' -c logging_collector=off &
     PG_PID=$!
     started_pg=1
 
-    # Shut postgres down cleanly however this job ends -- scancel, an error under
-    # `set -e`, or success. A killed postgres leaves $PGDATA dirty, and the *next*
-    # job silently pays for it in crash recovery.
+    # Stop postgres AND remove the node-local staging copy however this job ends --
+    # success, an error under `set -e`, or scancel/timeout (the INT/TERM trap converts
+    # SIGTERM into a normal exit so the EXIT trap runs). A hard SIGKILL cannot run this;
+    # the orphan reaper above cleans such leftovers on the next job on that node.
     stop_pg() {
-        apptainer exec --bind /dev/shm --bind /tmp "$SIF" \
+        apptainer exec --bind /dev/shm --bind /tmp ${STAGE_BIND[@]+"${STAGE_BIND[@]}"} "$SIF" \
             pg_ctl stop -D "$PGDATA" -m fast 2>/dev/null || true
         wait "$PG_PID" 2>/dev/null || true
     }
-    trap stop_pg EXIT
-    trap 'exit 143' INT TERM   # let the EXIT trap do the shutdown, then die
+    cleanup() {
+        stop_pg
+        if [ -n "${LOCAL_PGDATA:-}" ] && [ -d "$LOCAL_PGDATA" ]; then
+            echo "[$(date)] removing node-local staging $LOCAL_PGDATA"
+            rm -rf "$LOCAL_PGDATA"
+        fi
+    }
+    trap cleanup EXIT
+    trap 'exit 143' INT TERM   # let the EXIT trap do the shutdown + cleanup, then die
 
     # Wait generously: if a previous job was killed (scancel, or an error under
     # `set -e`), postgres starts by running crash recovery, which fsyncs the whole
@@ -123,7 +192,7 @@ echo "[$(date)] Running run_benchmark.py $* ..."
 python3 -u run_benchmark.py "$@"
 
 if [ "$started_pg" -eq 1 ]; then
-    echo "[$(date)] Stopping postgres..."
-    stop_pg
+    echo "[$(date)] Stopping postgres + removing node-local staging..."
+    cleanup            # stop postgres and delete the staged copy (EXIT trap re-runs it as a no-op)
 fi
 echo "[$(date)] Done."
