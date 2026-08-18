@@ -203,6 +203,11 @@ class QueryItem:
     target: dict                       # {video_id, start_s, end_s}
     source: dict = field(default_factory=dict)
     notes: str = ""
+    # Real human phrasings of THIS task, each {team, action, text}. Carried as
+    # metadata for the 2x2 run; only graded as queries in their own right under the
+    # opt-in variant facet (Runner.grade_variants — see VariantResult). Empty for
+    # authored-only items.
+    user_query_variants: list[dict] = field(default_factory=list)
     ground_truth: GroundTruth | None = None
 
     @classmethod
@@ -217,6 +222,7 @@ class QueryItem:
             target=item.get("target", {}),
             source=item.get("source", {}),
             notes=item.get("notes", ""),
+            user_query_variants=item.get("user_query_variants") or [],
             ground_truth=GroundTruth.from_item(item),
         )
 
@@ -267,6 +273,40 @@ def load_query_set(path: str) -> list[QueryItem]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# The per-variant facet (Omar, 2026-08-18): grade every REAL human phrasing of a
+# task as its own query, so the semantic axis is exercised by many real wordings
+# rather than the single authored decomposition. Each phrasing runs "nofilter" (does
+# this wording find the target at all?) and, when the item has a predicate, "filter"
+# (the task's shared filter — the filter is task-level, so this is not a new filter
+# measurement, only the same filter under many phrasings). Ranked ids only, exactly
+# like a Condition, but keyed "nofilter"/"filter" since here the VARYING thing is the
+# text, not a QueryItem attribute. Scored to a target RANK only: there is no
+# per-phrasing exact k-NN, so no Recall@k (that would need an oracle pass per
+# phrasing). Opt-in (Runner.grade_variants) — off, the file is byte-identical to a
+# 2x2-only run, so the harness contract is unchanged.
+# ─────────────────────────────────────────────────────────────────────────────
+VARIANT_CONDS: tuple[str, ...] = ("nofilter", "filter")
+
+
+@dataclass
+class VariantResult:
+    index: int                          # position in the item's user_query_variants
+    team: str
+    action: str
+    text: str
+    ids: dict[str, list[str]] = field(default_factory=dict)  # VARIANT_CONDS -> ranked ids
+
+    def to_dict(self) -> dict:
+        return {"index": self.index, "team": self.team, "action": self.action,
+                "text": self.text, "ids": self.ids}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "VariantResult":
+        return cls(index=d["index"], team=d.get("team", ""), action=d.get("action", ""),
+                   text=d.get("text", ""), ids=d.get("ids", {}))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # What an adapter run produces, per item — RANKED IDS ONLY (decided 2026-07-20;
 # scores/distances deliberately not carried — revisit if soft filters are added).
 # ─────────────────────────────────────────────────────────────────────────────
@@ -278,22 +318,30 @@ class RawResult:
     # meaningful FILTER cell) and so adding a condition doesn't reshape the file.
     ids: dict[str, list[str]] = field(default_factory=dict)
     latency_ms: dict[str, float] = field(default_factory=dict)
+    # Per-phrasing rankings, present only under the opt-in variant facet. Absent (an
+    # empty list) for a plain 2x2 run, and then dropped from to_dict entirely so the
+    # results file is unchanged.
+    variants: list[VariantResult] = field(default_factory=list)
 
     def conditions(self) -> list[str]:
         return [c for c in CONDITION_NAMES if c in self.ids]
 
     def to_dict(self) -> dict:
-        return {
+        d: dict = {
             "query_id": self.query_id,
             "ids": self.ids,
             "latency_ms": self.latency_ms,
         }
+        if self.variants:
+            d["variants"] = [v.to_dict() for v in self.variants]
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "RawResult":
         if "ids" in d:
             return cls(query_id=d["query_id"], ids=d["ids"],
-                       latency_ms=d.get("latency_ms", {}))
+                       latency_ms=d.get("latency_ms", {}),
+                       variants=[VariantResult.from_dict(v) for v in d.get("variants", [])])
         # Legacy two-condition file (pre-2026-08-04): `filtered` meant
         # vector_query + predicate, `unfiltered` meant raw_query_text alone.
         # Read it back as exactly those two cells so old runs stay analysable —
@@ -350,6 +398,40 @@ class RawResults:
 # ─────────────────────────────────────────────────────────────────────────────
 # Scored output — per item, plus aggregates. Emitted by the Analyzer.
 # ─────────────────────────────────────────────────────────────────────────────
+# The default gate for "succeeding phrasings" (Omar, 2026-08-18): a phrasing counts
+# as succeeding if it found the target within this rank WITHOUT a filter — i.e. the
+# wording could at least locate the target on its own. The two-version MRR (all
+# phrasings vs succeeding-only) separates "the query was too weak/vague" from a
+# filter/system effect, so a task with many hopeless phrasings does not drag the
+# MRR into looking like a system failure.
+SUCCEEDING_CAP = 100
+
+
+@dataclass
+class VariantMetric:
+    """One human phrasing's task-success score. Ranks keyed by VARIANT_CONDS
+    ("nofilter"/"filter"); no Recall — there is no per-phrasing exact GT."""
+
+    index: int
+    team: str
+    action: str
+    text: str
+    target_rank: dict[str, int | None] = field(default_factory=dict)
+
+    def rr(self, cond: str, cap: int | None = None) -> float:
+        return _reciprocal_rank(self.target_rank.get(cond), cap)
+
+    def succeeds(self, cap: int = SUCCEEDING_CAP) -> bool:
+        """Found the target within `cap` with NO filter — the succeeding-only gate."""
+        r = self.target_rank.get("nofilter")
+        return r is not None and r <= cap
+
+    def to_dict(self) -> dict:
+        return {"index": self.index, "team": self.team, "action": self.action,
+                "text": self.text, "target_rank": self.target_rank,
+                "rr": {c: self.rr(c) for c in self.target_rank}}
+
+
 @dataclass
 class QueryMetrics:
     """One item's scores, per condition. Every dict is keyed by condition name and
@@ -365,6 +447,8 @@ class QueryMetrics:
     # item has no filter / no computed selectivity.
     selectivity: float | None = None            # conjunction selectivity of the filter
     harm_exemplar: bool = False                 # target excluded by its own filter
+    # Per-phrasing scores, present only under the variant facet (empty otherwise).
+    variants: list[VariantMetric] = field(default_factory=list)
 
     def selectivity_class(self) -> str | None:
         if self.selectivity is None:
@@ -382,7 +466,7 @@ class QueryMetrics:
         return _reciprocal_rank(self.target_rank.get(cond), cap)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "query_id": self.query_id,
             "scorable": self.scorable,
             "recall": {c: {str(k): v for k, v in ks.items()}
@@ -393,6 +477,9 @@ class QueryMetrics:
             "selectivity": self.selectivity,
             "harm_exemplar": self.harm_exemplar,
         }
+        if self.variants:
+            d["variants"] = [v.to_dict() for v in self.variants]
+        return d
 
 
 @dataclass
@@ -458,6 +545,51 @@ class Metrics:
     # practice, but contributes 0.00125 to an uncapped MRR and so hides there.
     def mrr(self, cond: str, cap: int | None = None, common: bool = True) -> float:
         return _safe_mean([m.rr(cond, cap) for m in self._rows(cond, common)])
+
+    # ── per-variant aggregation (the "grade every phrasing" facet) ──────────────
+    # These pool over PHRASINGS, not items: the unit is one real user wording. The
+    # `common`/`comparable` item-subset logic does not apply — a variant is scored
+    # on target rank alone (no per-cell GT to gate on), so the only gate is the
+    # succeeding filter below. cond is a VARIANT_CONDS key ("nofilter"/"filter").
+    def has_variants(self) -> bool:
+        return any(m.variants for m in self.per_query)
+
+    def variant_rows(self) -> list["VariantMetric"]:
+        return [v for m in self.per_query for v in m.variants]
+
+    def variant_mrr(self, cond: str, cap: int | None = None,
+                    succeeding_cap: int | None = None) -> float:
+        """MRR over all graded phrasings for `cond`. With `succeeding_cap` set,
+        restrict to phrasings whose NO-FILTER rank is within it — the 'the query
+        could at least find it unfiltered' subset (Omar's two-version MRR)."""
+        rows = self.variant_rows()
+        if succeeding_cap is not None:
+            rows = [v for v in rows if v.succeeds(succeeding_cap)]
+        return _safe_mean([v.rr(cond, cap) for v in rows])
+
+    def variant_n(self, succeeding_cap: int | None = None) -> int:
+        rows = self.variant_rows()
+        if succeeding_cap is not None:
+            rows = [v for v in rows if v.succeeds(succeeding_cap)]
+        return len(rows)
+
+    def variant_mrr_by_task(self, cond: str, cap: int | None = None,
+                            succeeding_cap: int | None = None) -> dict[str, float]:
+        """Per-task variant MRR — one number per item, the boxplot's central tendency."""
+        out: dict[str, float] = {}
+        for m in self.per_query:
+            rows = m.variants
+            if succeeding_cap is not None:
+                rows = [v for v in rows if v.succeeds(succeeding_cap)]
+            if rows:
+                out[m.query_id] = _safe_mean([v.rr(cond, cap) for v in rows])
+        return out
+
+    def variant_task_rr(self, cond: str, cap: int | None = None) -> dict[str, list[float]]:
+        """Per-task list of per-phrasing reciprocal ranks — the boxplot payload
+        (one distribution per task)."""
+        return {m.query_id: [v.rr(cond, cap) for v in m.variants]
+                for m in self.per_query if m.variants}
 
     # Latency is a system property independent of scorability, so it is summarised
     # over every item that RAN the condition — a filtered search still has a real

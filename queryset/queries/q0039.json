@@ -1,0 +1,286 @@
+{
+  "query_id": "q0039",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kis-t9",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "A first person view from a model airplane landing in a snowy landscape, from a camera mounted on the plane. There is a wall (fence) on the right, and a house behind it, and a snow pile, a smaller building and utility poles in front. The plane with the camera mounted on it is visible at another location in the video.",
+  "decomposition": {
+    "vector_query": "first person view from a model airplane landing, from a camera mounted on the plane; a fence on the right, a house behind it, a smaller building and utility poles in front",
+    "filters": [
+      {
+        "filter_type": "scene",
+        "attribute": "scene_label",
+        "op": "in",
+        "value": [
+          "snowfield",
+          "ice_shelf",
+          "ski_slope"
+        ],
+        "vocab": "places365",
+        "mapping_source": "author_probe",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "19239",
+    "start_s": 247.88,
+    "end_s": 253.21
+  },
+  "user_query_variants": [
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "model airplane landing on snow"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "model airplane landing first person view"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a model airplane landing in a snowy landscape"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "model airplane landing on snowy landscape pov from plane"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A first person view from a model airplane landing in a snowy landscape from a camera mounted on the plane"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A first person view from a model airplane landing in a snowy landscape"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "first person view of model airplane landing on snow"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "model airplane landing first person view snow"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "landing in a snowy landscape"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "first person view from a model airplane landing in a snowy landscape from a camera mounted on the plane"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A first person view from a model airplane landing in a snowy landscape there is a fence on the right and a house behind it and a snow pile a smaller building and utility poles in front"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a snowy landscape from above"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "model airplane landing on snowy landscape pov from plane fence on the right and snowpile"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "first person view from a model airplane landing in a snowy landscape from a camera mounted on the plane utility poles"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a snowy landscape. there is a wall on the right and a house behind it"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "model airplane landing on snowy landscape pov from plane fence on the right and snowpile utility poles on the front"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "first person view of model airplane landing on snow with wall and house in the background"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "first person view from a model airplane landing in a snowy landscape from a camera mounted on the plane utility poles with houses and fences"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "landing on snowy landscape pov from plane fence on the right and snowpile utility poles on the front"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "an areial view of a snowy landscape. there is a wall on the right and a house behind it"
+    },
+    {
+      "team": "prak3",
+      "action": "temporalQuery",
+      "text": "['first person view from a model airplane landing in a snowy landscape from a camera mounted on the plane utility poles with houses and fences', 'plane with camera']"
+    },
+    {
+      "team": "prak1",
+      "action": "temporalQuery",
+      "text": "['an areial view of a snowy landscape. there is a wall on the right and a house behind it', 'a model airplane']"
+    },
+    {
+      "team": "prak5",
+      "action": "temporalQuery",
+      "text": "['A first person view from a model airplane landing in a snowy landscape there is a fence on the right and a house behind it and a snow pile a smaller building and utility poles in front', 'plane']"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "model airplane landing on snow with wall and house in the background and a snow pile"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snow land scape air view house and fence"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "snowpile and building, fence on the right, utility poles on the fron"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snow land scape air view house and fence"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "plane landing in snow"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "fence on the right and a house and snowpile behind it. on the front tility poles"
+    },
+    {
+      "team": "prak1",
+      "action": "temporalQuery",
+      "text": "['a snowy landscape with a a fence and a house', 'a model airplane']"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "model airplane in snow"
+    },
+    {
+      "team": "prak3",
+      "action": "temporalQuery",
+      "text": "['firtst person view from model plane in snow', 'model plane']"
+    },
+    {
+      "team": "prak3",
+      "action": "temporalQuery",
+      "text": "['firtst person view from model plane in snow utility poles', 'model plane']"
+    },
+    {
+      "team": "prak2",
+      "action": "temporalQuery",
+      "text": "['model plane', 'fence on the right and a house and snowpile behind it. on the front tility poles']"
+    },
+    {
+      "team": "prak4",
+      "action": "textQuery",
+      "text": "model airplane landing on snow"
+    },
+    {
+      "team": "prak1",
+      "action": "temporalQuery",
+      "text": "['a model airplane', 'a snowy landscape with a house']"
+    },
+    {
+      "team": "prak3",
+      "action": "temporalQuery",
+      "text": "['model plane', 'firtst person view from model plane in snow utility poles']"
+    },
+    {
+      "team": "prak2",
+      "action": "temporalQuery",
+      "text": "['model plane', 'snowy landscape']"
+    },
+    {
+      "team": "prak1",
+      "action": "temporalQuery",
+      "text": "['a snowy landscape with a house and fence', 'a model airplane']"
+    },
+    {
+      "team": "prak2",
+      "action": "temporalQuery",
+      "text": "['model plane', 'snowy landscape']"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "model airplane in snow"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "utility poles in form of two buildings in snow"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "utility poles in form of two buildings in snow from above"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snow house with fence"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "snow house with fence aerial view"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a snowy white landscape with a fence"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a snowy white landscape with a fence and a house. the view is from above"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "landing in snow house"
+    },
+    {
+      "team": "prak2",
+      "action": "temporalQuery",
+      "text": "['model plane pov plane', 'snowy landscape']"
+    }
+  ],
+  "notes": "VBS2026 Textual-KIS task t9, 49 real user formulations for V3C3 target 19239. raw_query_text = the authored official hint (decided baseline, 2026-08-18). SCENE decomposition chosen over object: pg-free probe (job 104515) shows the target keyframes carry scene 'snowfield' max=0.620 on 11/12 kf, 'ice_shelf' 0.549 (10/12), 'ski_slope' 0.201 (3/12) at t_scene>=0.10 -> target passes robustly on 'snowfield' alone. The users' salient OBJECT 'model airplane' was NOT detected (best 'airplane' only 0.24 < 0.30), so an object filter would EXCLUDE the target -- a filter-choice signal, not an authoring error. Filter labels from author_probe (target-inspection), not yet oracle-verified: status=draft, verified=false until build_gt confirms target_passes_filter + selectivity. OPEN FOR REVIEW: (a) full hint exceeds the SigLIP 64-token limit so raw_query_text is truncated at encode time; (b) whether to keep the 3-label scene set (broader semantic 'snowy landscape', looser selectivity) or tighten to 'snowfield' alone (already passes 11/12); (c) vector_query wording (snowy-scene attribute pulled into the filter)."
+}

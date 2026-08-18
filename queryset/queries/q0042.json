@@ -1,0 +1,119 @@
+{
+  "query_id": "q0042",
+  "status": "draft",
+  "source": {
+    "dataset": "vbs2026",
+    "team": "prak+exquisitor",
+    "task_name": "vbs26-kis-t12",
+    "task_type": "Textual KIS",
+    "timestamp": null,
+    "solved_by_team": null
+  },
+  "raw_query_text": "A man runs down a path with stairs in a park, jumps over a wall with a flip, rolling down below the wall, and continues running. When he does the flip, a statue can be seen in the background. He wears black trousers, a yellow hoodie and a black backpack. It is winter, there are patches of snow on the ground and trees without leaves.",
+  "decomposition": {
+    "vector_query": "a man runs down a path with stairs in a park, jumps over a wall with a flip and rolls down below it then continues running, a statue can be seen in the background, he wears black trousers and a yellow hoodie, it is winter with patches of snow and bare trees",
+    "filters": [
+      {
+        "filter_type": "object",
+        "attribute": "object_label",
+        "op": "contains",
+        "value": [
+          "backpack"
+        ],
+        "vocab": "yoloworld-open-vocab",
+        "mapping_source": "author_probe",
+        "verified": false
+      }
+    ],
+    "method": "manual",
+    "verified": false
+  },
+  "target": {
+    "video_id": "18985",
+    "start_s": 122.2,
+    "end_s": 131.72
+  },
+  "user_query_variants": [
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "parkour in a park"
+    },
+    {
+      "team": "prak4",
+      "action": "temporalQuery",
+      "text": "['man doing flip over wall', 'man running']"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man runs down a path with stairs in a park, jumps over a wall with a flip"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man runs down a path with stairs in a park, jumps over a wall with a flip"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "jumping over wall with a flip"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A man runs down a path with stairs in a park, jumps over a wall with a flip, rolling down before a wall and continues running"
+    },
+    {
+      "team": "prak1",
+      "action": "temporalQuery",
+      "text": "['a man runs down a path with stairs in a park', 'a man is rolling down below a wall']"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "parkour park stairs"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "parkour park stairs"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "jumping over wall with a flip statue in the background"
+    },
+    {
+      "team": "exquisitor",
+      "action": "textQuery",
+      "text": "yellow hoodie black backpack parkour"
+    },
+    {
+      "team": "prak4",
+      "action": "temporalQuery",
+      "text": "['man with black trousers, yellow hoodie and backpack doing flip over a wall in a park', 'man running with statue on background']"
+    },
+    {
+      "team": "prak3",
+      "action": "textQuery",
+      "text": "man runs down a path with stairs in a park, jumps over a wall with a flip black trousers yellow hoodie backpack"
+    },
+    {
+      "team": "prak2",
+      "action": "textQuery",
+      "text": "man with black backpack jumping over wall with a flip statue in the background"
+    },
+    {
+      "team": "prak5",
+      "action": "textQuery",
+      "text": "A man runs down a path with stairs in a park, jumps over a wall with a flip, rolling down before a wall and continues running, when he does the flip a statue can be seen in the background He wars black trousers a yellow hoodie and black backpack"
+    },
+    {
+      "team": "prak1",
+      "action": "textQuery",
+      "text": "a man does a flip over a wall. in the background there is a statue. he wears black trousers and a yellow hoodie"
+    }
+  ],
+  "notes": "VBS2026 Textual-KIS task t12, 16 real user formulations for V3C3 target 18985 (parkour runner). raw_query_text = authored official hint. OBJECT filter {backpack}: probe shows target passes strongly on obj 'backpack' 0.822 (3/4 kf) at t_object>=0.30 -- the one salient, query-relevant object ('a black backpack') that the detector reliably found. The other named cues are absent: 'stairs' undetected, 'statue' undetected, scene 'park' weak (0.167, 1/4), 'wall'->fence only 0.456 on 1/4. Single strong label keeps the filter selective while the target passes robustly. author_probe label, oracle-pending (status=draft). (fence 0.456 available as an alternative/broadening label.)"
+}
