@@ -1,6 +1,6 @@
 {
-  "version": "2.0.0",
-  "corpus": "v3c1",
-  "description": "FRAME KIS query set — real VBS2021 typed team queries over V3C1, decomposed into a semantic part + structured filter predicates.",
+  "version": "2.1.0",
+  "corpus": "v3c1+2+3",
+  "description": "FRAME KIS query set — real VBS typed team queries decomposed into a semantic part + structured filter predicates. VBS2021 tasks over V3C1, plus VBS2026 textual-KIS tasks (q0039–q0042) whose targets span V3C1+2+3.",
   "_bumping": "MAJOR: a query's meaning changed, items removed, or GT recomputed under different parameters (prior results void). MINOR: items added only (prior results still valid on the shared items). PATCH: nothing result-affecting (notes, status, verified flags). build.py warns if the contents changed but this version did not."
 }
