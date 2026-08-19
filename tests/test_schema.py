@@ -358,6 +358,19 @@ def test_metrics_write_jsonl(tmp_path):
     assert row["rr"][FILT] == 0.5
 
 
+def test_metrics_ef_search_in_header_when_set(tmp_path):
+    # the k×ef sweep tags each metrics file with its ef; None (default) stays absent
+    # so pre-sweep files are byte-identical (see test_metrics_write_jsonl)
+    import json
+
+    m = Metrics(system="s", ks=(5,), retrieval_k=50, ef_search=200,
+                per_query=[_qm("q1", recall={FILT: {5: 1.0}}, rank={FILT: 2})])
+    p = tmp_path / "metrics.jsonl"
+    m.write_jsonl(str(p))
+    header = json.loads(p.read_text().splitlines()[0])
+    assert header["ef_search"] == 200
+
+
 # ─── capped MRR (Omar, 28-07-2026) ──────────────────────────────────────────
 
 def test_capped_mrr_counts_too_deep_as_a_miss():

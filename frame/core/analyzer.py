@@ -171,7 +171,7 @@ class Analyzer:
 
         per_query = [self._score_one(r, gt_by_id.get(r.query_id)) for r in results]
         return Metrics(system=raw.system, ks=self.ks, per_query=per_query,
-                       retrieval_k=raw.k,
+                       retrieval_k=raw.k, ef_search=raw.ef_search,
                        benchmark=benchmark if benchmark is not None else raw.benchmark,
                        harness_contract=HARNESS_CONTRACT)
 

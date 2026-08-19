@@ -41,7 +41,7 @@ from typing import Sequence
 
 from .adapter import VectorDBAdapter
 from .encode import Encoder
-from .schema import CONDITIONS, Predicate, QueryItem, RawResult, RawResults, VariantResult
+from .schema import CONDITIONS, Condition, Predicate, QueryItem, RawResult, RawResults, VariantResult
 from .version import HARNESS_CONTRACT, BenchmarkVersion  # noqa: F401  (annotation)
 
 DEFAULT_K = 1000
@@ -83,11 +83,18 @@ class Runner:
         warmup: int = DEFAULT_WARMUP,
         repeat: int = DEFAULT_REPEAT,
         grade_variants: bool = False,
+        conditions: "Sequence[Condition] | None" = None,
     ):
         self.adapter = adapter
         self.encoder = encoder
         self.warmup = max(0, warmup)
         self.repeat = max(1, repeat)
+        # Which of the 2x2 cells to run. Defaults to the full matrix; the k×ef sweep
+        # passes a LEAN subset (semantic+filter, semantic+nofilter) — ef is a recall
+        # dial only on the HNSW path, so the two semantic cells carry the signal and
+        # the two raw cells would only add filtered-search cost. An item with no
+        # predicate still drops its filter cells (see _run_items), as always.
+        self.conditions = tuple(conditions) if conditions is not None else CONDITIONS
         # Opt-in: also run every real human phrasing of each item as its own query
         # (schema.VariantResult). Off by default — the extra searches are non-trivial
         # (a filtered phrasing pays the same filter cost as a 2x2 filter cell), and a
@@ -114,6 +121,12 @@ class Runner:
                             "harness_contract": HARNESS_CONTRACT}
             if benchmark is not None:
                 header["benchmark"] = benchmark.to_dict()
+            # Keep this header byte-identical to RawResults.write_jsonl (same keys,
+            # same order) so a streamed partial file reads back unchanged — ef_search
+            # last, and omitted when the adapter left its default in place.
+            ef = getattr(self.adapter, "ef_search", None)
+            if ef is not None:
+                header["ef_search"] = ef
             sink.write(json.dumps(header) + "\n")
             sink.flush()
         try:
@@ -122,7 +135,8 @@ class Runner:
             if sink is not None:
                 sink.close()
         return RawResults(system=self.adapter.name, k=k, results=results,
-                          benchmark=benchmark, harness_contract=HARNESS_CONTRACT)
+                          benchmark=benchmark, harness_contract=HARNESS_CONTRACT,
+                          ef_search=getattr(self.adapter, "ef_search", None))
 
     def _run_items(self, items, k, sink):
         results: list[RawResult] = []
@@ -145,7 +159,7 @@ class Runner:
             vectors = {attr: self.encoder.encode(getattr(item, attr))
                        for attr in sorted({c.text_attr for c in CONDITIONS})}
 
-            for cond in CONDITIONS:
+            for cond in self.conditions:
                 if cond.filtered and not item.filters:
                     continue        # empty predicate: identical to the no-filter cell
                 filters = item.filters if cond.filtered else []
