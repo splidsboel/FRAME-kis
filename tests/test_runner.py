@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 from frame.core.runner import Runner
-from frame.core.schema import CONDITION_NAMES, QueryItem
+from frame.core.schema import BY_NAME, CONDITION_NAMES, QueryItem, RawResults
 
 
 def test_run_produces_one_result_per_item(enriched_item, fake_adapter, fake_encoder):
@@ -33,6 +33,37 @@ def test_run_covers_the_full_2x2(enriched_item, fake_adapter, fake_encoder):
     n_filters_seen = sorted(nf for nf, _ in fake_adapter.search_calls)
     assert n_filters_seen == [0, 0, 1, 1]
     assert {k for _, k in fake_adapter.search_calls} == {5}
+
+
+def test_conditions_subset_runs_only_those_cells(enriched_item, fake_adapter, fake_encoder):
+    # the k×ef sweep runs a LEAN subset — the two semantic cells only
+    item = QueryItem.from_dict(enriched_item)
+    lean = (BY_NAME["semantic+filter"], BY_NAME["semantic+nofilter"])
+    raw = Runner(fake_adapter, fake_encoder, warmup=0, repeat=1,
+                 conditions=lean).run([item], k=5)
+    r = raw.results[0]
+    assert r.conditions() == ["semantic+nofilter", "semantic+filter"]
+    assert len(fake_adapter.search_calls) == 2          # one filtered, one not
+    assert sorted(nf for nf, _ in fake_adapter.search_calls) == [0, 1]
+
+
+def test_ef_search_stamped_into_results(enriched_item, fake_adapter, fake_encoder, tmp_path):
+    # the sweep needs each cell's ef recorded in the artifact, not just the filename
+    fake_adapter.ef_search = 200
+    item = QueryItem.from_dict(enriched_item)
+    p = tmp_path / "raw.jsonl"
+    raw = Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run(
+        [item], k=5, progress_path=str(p))
+    assert raw.ef_search == 200
+    # the streamed header carries it too, and reads back unchanged
+    assert RawResults.read_jsonl(str(p)).ef_search == 200
+
+
+def test_ef_search_absent_when_adapter_has_no_default(enriched_item, fake_adapter, fake_encoder):
+    # a plain adapter (no ef_search attr) leaves it None — old files stay clean
+    item = QueryItem.from_dict(enriched_item)
+    raw = Runner(fake_adapter, fake_encoder, warmup=0, repeat=1).run([item], k=5)
+    assert raw.ef_search is None
 
 
 def test_run_encodes_each_text_once_per_item(enriched_item, fake_adapter, fake_encoder):

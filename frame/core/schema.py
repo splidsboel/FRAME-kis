@@ -368,6 +368,11 @@ class RawResults:
     # when it was written before versioning existed — which is the case worth
     # catching (see RawResults.read_jsonl).
     harness_contract: int = HARNESS_CONTRACT
+    # Search-beam width the run used (hnsw.ef_search / hnswlib ef_search). Carried so
+    # a k×ef sweep's artifacts are self-describing — one metrics/raw file names the
+    # (k, ef) cell it came from without parsing the filename. None on older files and
+    # on runs that left the adapter's default ef in place.
+    ef_search: int | None = None
 
     def __iter__(self) -> Iterator[RawResult]:
         return iter(self.results)
@@ -377,6 +382,8 @@ class RawResults:
                         "harness_contract": self.harness_contract}
         if self.benchmark is not None:
             header["benchmark"] = self.benchmark.to_dict()
+        if self.ef_search is not None:
+            header["ef_search"] = self.ef_search
         with open(path, "w") as f:
             f.write(json.dumps(header) + "\n")
             for r in self.results:
@@ -392,7 +399,8 @@ class RawResults:
         bench = header.get("benchmark")
         return cls(system=header["system"], k=header["k"], results=rows,
                    benchmark=BenchmarkVersion.from_dict(bench) if bench else None,
-                   harness_contract=header.get("harness_contract", 0))
+                   harness_contract=header.get("harness_contract", 0),
+                   ef_search=header.get("ef_search"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -495,6 +503,9 @@ class Metrics:
     # may be compared with (frame/core/version.py).
     benchmark: "BenchmarkVersion | None" = None
     harness_contract: int = HARNESS_CONTRACT
+    # Search-beam width of the run these scores came from (RawResults.ef_search).
+    # Carried through analyze() so a metrics file names its (k, ef) sweep cell.
+    ef_search: int | None = None
 
     def conditions(self) -> list[str]:
         """Conditions this run produced, in canonical order."""
@@ -511,7 +522,7 @@ class Metrics:
             system=self.system, ks=self.ks,
             per_query=[m for m in self.per_query if m.query_id in keep],
             retrieval_k=self.retrieval_k, benchmark=self.benchmark,
-            harness_contract=self.harness_contract,
+            harness_contract=self.harness_contract, ef_search=self.ef_search,
         )
 
     def cap_is_meaningful(self, cap: int) -> bool:
@@ -625,6 +636,8 @@ class Metrics:
         }
         if self.benchmark is not None:
             header["benchmark"] = self.benchmark.to_dict()
+        if self.ef_search is not None:
+            header["ef_search"] = self.ef_search
         with open(path, "w") as f:
             f.write(json.dumps(header) + "\n")
             for m in self.per_query:
