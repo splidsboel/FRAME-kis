@@ -72,7 +72,7 @@ pick_stage_base() {
         jid="${d##*_}"
         case "$jid" in ''|*[!0-9]*) continue ;; esac       # skip non-numeric suffixes
         if [ -z "$(squeue -h -j "$jid" -o %i 2>/dev/null)" ]; then
-            echo "[$(date)] reaping orphan staging $d (job $jid not in queue)"; rm -rf "$d"
+            echo "[$(date)] reaping orphan staging $d (job $jid not in queue)" >&2; rm -rf "$d"
         fi
     done
 }
