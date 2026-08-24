@@ -387,15 +387,26 @@ def plot_harm_exemplars(rows, out, system, stamp=None):
     findable) next to the fact that the filter excludes it entirely. That contrast
     is the harm the exclusive-filter queries exist to measure (Omar, 2026-08-03/10).
     """
-    ex = sorted((r for r in rows if r.get("harm_exemplar")),
-                key=lambda r: r["query_id"])
-    if not ex:
-        print("  (no harm exemplars — skipping harm_exemplars)")
-        return
-
     def rank(r, cond):
         v = (r.get("target_rank") or {}).get(cond)
         return v if v else np.nan
+
+    # The figure's premise is that the target IS findable without the filter, so the
+    # exclusion by the filter is the harm. An exemplar whose target is not found in
+    # EITHER no-filter condition (e.g. q0003 — the OCR pattern-match, a double failure
+    # where the query also cannot localise it) violates that premise and would plot as
+    # an empty row; drop it and say so.
+    candidates = sorted((r for r in rows if r.get("harm_exemplar")),
+                        key=lambda r: r["query_id"])
+    ex = [r for r in candidates
+          if not (np.isnan(rank(r, "raw+nofilter")) and np.isnan(rank(r, "semantic+nofilter")))]
+    dropped = [r["query_id"] for r in candidates if r not in ex]
+    if dropped:
+        print(f"  (harm_exemplars: excluding {', '.join(dropped)} — target not "
+              f"findable without the filter either)")
+    if not ex:
+        print("  (no harm exemplars — skipping harm_exemplars)")
+        return
 
     y = np.arange(len(ex))
     raw = [rank(r, "raw+nofilter") for r in ex]
