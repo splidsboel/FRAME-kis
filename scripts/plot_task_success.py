@@ -59,6 +59,24 @@ mpl.rcParams.update({
 CAP = SUCCEEDING_CAP  # 100 — the depth-100 success gate
 
 
+def graded_under(m: Metrics, cond: str):
+    """Variants ACTUALLY graded under `cond`. A variant carries a rank key only for
+    the conditions its item ran: an unfiltered item (no predicate) has no `filter`
+    key, and must be excluded from the filter aggregate rather than counted as a
+    filter miss (rr=0) — otherwise the 7 unfiltered tasks dilute every filter number
+    and clutter the filter boxplot with all-zero boxes."""
+    return [v for v in m.variant_rows() if cond in v.target_rank]
+
+
+def rr(v, cond: str, cap: int | None = CAP) -> float:
+    r = v.target_rank.get(cond)
+    return 0.0 if (r is None or (cap is not None and r > cap)) else 1.0 / r
+
+
+def mean(xs) -> float:
+    return sum(xs) / len(xs) if xs else 0.0
+
+
 def save(fig, out, name):
     os.makedirs(out, exist_ok=True)
     for ext in ("pdf", "png"):
@@ -93,37 +111,39 @@ def load_metrics(path: str) -> Metrics:
 
 def print_two_version(m: Metrics) -> dict:
     """Table: MRR@cap over ALL phrasings vs SUCCEEDING-only, per variant condition."""
-    conds = [c for c in VARIANT_CONDS if any(c in v.target_rank for v in m.variant_rows())]
-    n = m.variant_n()
-    n_succ = m.variant_n(succeeding_cap=CAP)
+    conds = [c for c in VARIANT_CONDS if graded_under(m, c)]
     n_tasks = sum(1 for q in m.per_query if q.variants)
-    print(f"  {m.system}: {n} phrasings over {n_tasks} tasks; "
-          f"{n_succ}/{n} succeed (no-filter rank <= {CAP})")
-    print(f"    {'cond':<10} | {'MRR all':>8} | {'MRR succ-only':>13}")
-    print(f"    {'-'*10}-+-{'-'*8}-+-{'-'*13}")
+    # The succeeding gate is the SAME phrasings for every cond (no-filter rank <= CAP),
+    # but restricted to the ones graded under that cond.
+    print(f"    {'cond':<10} | {'n phr':>6} | {'MRR all':>8} | {'n succ':>6} | {'MRR succ-only':>13}")
+    print(f"    {'-'*10}-+-{'-'*6}-+-{'-'*8}-+-{'-'*6}-+-{'-'*13}")
     table = {}
     for c in conds:
-        all_mrr = m.variant_mrr(c, cap=CAP)
-        succ_mrr = m.variant_mrr(c, cap=CAP, succeeding_cap=CAP)
-        table[c] = (all_mrr, succ_mrr)
-        print(f"    {c:<10} | {all_mrr:>8.3f} | {succ_mrr:>13.3f}")
-    return {"conds": conds, "n": n, "n_succ": n_succ, "n_tasks": n_tasks, "table": table}
+        vs = graded_under(m, c)
+        succ = [v for v in vs if v.succeeds(CAP)]
+        all_mrr = mean([rr(v, c) for v in vs])
+        succ_mrr = mean([rr(v, c) for v in succ])
+        table[c] = {"n": len(vs), "n_succ": len(succ), "all": all_mrr, "succ": succ_mrr}
+        print(f"    {c:<10} | {len(vs):>6} | {all_mrr:>8.3f} | {len(succ):>6} | {succ_mrr:>13.3f}")
+    print(f"  ({m.system}: {n_tasks} tasks with variants)")
+    return {"conds": conds, "n_tasks": n_tasks, "table": table}
 
 
 def plot_two_version(m: Metrics, summary: dict, out: str):
     conds = summary["conds"]
+    t = summary["table"]
     x = np.arange(len(conds))
     w = 0.38
-    all_v = [summary["table"][c][0] for c in conds]
-    succ_v = [summary["table"][c][1] for c in conds]
+    all_v = [t[c]["all"] for c in conds]
+    succ_v = [t[c]["succ"] for c in conds]
     fig, ax = plt.subplots(figsize=(1.6 + 1.4 * len(conds), 4.2))
-    ax.bar(x - w/2, all_v, w, color=GRAY, label=f"all phrasings (n={summary['n']})")
-    ax.bar(x + w/2, succ_v, w, color=BLUE,
-           label=f"succeeding-only (n={summary['n_succ']})")
+    ax.bar(x - w/2, all_v, w, color=GRAY, label="all phrasings")
+    ax.bar(x + w/2, succ_v, w, color=BLUE, label="succeeding-only (no-filter rank ≤ cap)")
     for xi, (a, s) in enumerate(zip(all_v, succ_v)):
         ax.annotate(f"{a:.3f}", (xi - w/2, a), ha="center", va="bottom", fontsize=8, color=INK2)
         ax.annotate(f"{s:.3f}", (xi + w/2, s), ha="center", va="bottom", fontsize=8, color=BLUE)
-    ax.set_xticks(x); ax.set_xticklabels(conds)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{c}\nn={t[c]['n']} (succ {t[c]['n_succ']})" for c in conds])
     ax.set_ylabel(f"MRR@{CAP} over human phrasings")
     ax.set_title(f"Task success — two-version MRR ({m.system})", color=INK)
     ax.set_ylim(0, max(all_v + succ_v) * 1.18)
@@ -132,7 +152,10 @@ def plot_two_version(m: Metrics, summary: dict, out: str):
 
 
 def plot_per_task_box(m: Metrics, cond: str, out: str):
-    task_rr = m.variant_task_rr(cond, cap=CAP)  # id -> [rr per phrasing]
+    # id -> [rr per phrasing], only over tasks actually graded under this cond
+    task_rr = {q.query_id: [rr(v, cond) for v in q.variants if cond in v.target_rank]
+               for q in m.per_query}
+    task_rr = {q: xs for q, xs in task_rr.items() if xs}
     if not task_rr:
         return
     # order tasks by median rr (ascending) so the long tail of ~0 tasks reads first
@@ -150,7 +173,7 @@ def plot_per_task_box(m: Metrics, cond: str, out: str):
     for i, ys in enumerate(data):
         xs = i + (rng.random(len(ys)) - 0.5) * 0.4
         ax.scatter(xs, ys, s=8, color=BLUE, alpha=0.35, linewidths=0, zorder=3)
-    pooled = m.variant_mrr(cond, cap=CAP)
+    pooled = mean([rr(v, cond) for v in graded_under(m, cond)])
     ax.axhline(pooled, color=ORANGE, linewidth=1.3, linestyle="--",
                label=f"pooled MRR@{CAP} = {pooled:.3f}")
     ax.set_xticks(np.arange(len(order)))
