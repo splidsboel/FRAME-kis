@@ -1,23 +1,79 @@
-# FRAME — a Filtered-ANN benchmark suite for Known-Item Search
+# FRAME
 
-FRAME benchmarks how vector-database systems handle **filtered approximate
-nearest-neighbor search** under realistic Known-Item-Search (KIS) workloads over
-the [V3C](https://videobrowsershowdown.org/) video collection.
+FRAME is a benchmark for filtered approximate nearest-neighbor (ANN) search. It
+measures how vector databases behave when a similarity query is combined with
+structured filters, using real Known-Item-Search (KIS) queries over the
+[V3C](https://videobrowsershowdown.org/) video collection instead of synthetic
+predicates at swept selectivities.
 
-Instead of synthetic predicates at swept selectivities, its queries come from real
-interactive-retrieval sessions. Each query is decomposed into a **semantic part**
-(sent to an embedding model) and **structured filter predicates** (scene, object,
-in-frame text), each with exact ground truth. Running every query both *with* and
-*without* its filters lets the suite measure the **delta** from pushing an
-attribute into a filter versus leaving it in the embedding query — under two
-lenses:
+The queries come from interactive-retrieval sessions. Each one is split into a
+semantic part that goes to an embedding model and a set of filter predicates
+(scene, object, in-frame text), and every part has exact ground truth. Running a
+query with and without its filters shows the effect of pushing an attribute into
+a filter rather than leaving it in the embedding query. FRAME reports two things
+about that effect:
 
-- **Geometric correctness** — Recall@k against exact k-NN.
-- **Task success (KIS)** — rank of the known target item, summarised as MRR.
+- **Recall@k** against exact k-NN (is the approximate index still finding the
+  right neighbors?).
+- **Task success**, the rank of the known target item, summarized as MRR (does
+  the filter help or hurt the actual search task?).
+
+The suite currently ships adapters for **pgvector** and **ChromaDB**, and a
+data-prep pipeline that builds the V3C dataset from raw shards.
+
+## Install
+
+FRAME uses [uv](https://docs.astral.sh/uv/). The core harness has a light
+dependency footprint; the heavy toolchains live behind optional extras so you
+only pull what a given task needs.
+
+```bash
+uv sync                                    # core harness + tests
+uv sync --extra pgvector --extra encode    # run against pgvector
+uv sync --extra chroma   --extra encode    # run against ChromaDB
+```
+
+| extra | pulls in | needed for |
+|---|---|---|
+| `pgvector` | psycopg2 | the pgvector adapter |
+| `chroma` | chromadb (>=1.5) | the Chroma adapter |
+| `encode` | torch, transformers | the shared SigLIP encoder |
+| `oracle` | torch, transformers, psycopg2 | the ground-truth build |
+| `viz` | matplotlib | the plotting scripts |
+
+## Quickstart
+
+```bash
+# 1. compile the authored query set into data/benchmark.jsonl
+uv run python queryset/build.py
+
+# 2. fill in exact ground truth (needs the V3C DB and a GPU; see oracle/)
+sbatch build_gt.sh --scene-threshold 0.10 --object-threshold 0.30
+
+# 3. run a system and score it
+uv run python run_benchmark.py --system pgvector
+```
+
+`run_benchmark.py` runs every query in all four conditions (see below), scores the
+ranked ids against the oracle, and writes `data/metrics.<system>.jsonl`. Retrieval
+depth is a swept axis rather than a single deep run: the suite sweeps `k` and
+`ef_search` directly (`--k-grid`, `--ef-grid`, or `--iterative-scan sweep`) so the
+approximate path is measured at the depth it actually runs at, avoiding the plan
+bias a cost-based planner would show if one deep run were truncated after the
+fact. The default operating point is a moderate `k`, with `k=1000` kept as a
+recall ceiling. Runs record latencies with warmup and repeats, and refuse to score
+results produced against a different query set or harness contract unless you pass
+`--allow-mismatch`. See `uv run python run_benchmark.py --help` for the full set of
+knobs.
+
+On the cluster, submit `run_benchmark.sh` and `build_gt.sh` from the repo root
+with `sbatch`; both write their output to `logs/`.
 
 ## How it works
 
-A benchmark run has two halves that meet at scoring:
+A run has an offline half that computes what the correct answer *is*, and an
+online half that asks each system the same questions through a real index. They
+meet at scoring.
 
 ```
 OFFLINE / ORACLE (system-agnostic, exact)      ONLINE / SYSTEM UNDER TEST
@@ -36,46 +92,72 @@ data/benchmark.jsonl ──┐                     Runner(adapter, encoder).run(
         data/metrics.<sys>.jsonl   (Recall@k, MRR, filtered-vs-unfiltered Δ)
 ```
 
-The **oracle** computes what the correct answer *is* (exact search, independent of
-any system). Each **adapter** answers the same queries through a real index. Their
-predicate translations are deliberately separate code paths — the gap between the
-oracle's exact result and a system's approximate one is precisely what the
-benchmark reports.
+The oracle does exact search, independent of any system, so its answer is the
+reference. Each adapter answers the same queries through its own index and filter
+translation. The gap between the two is what the benchmark reports.
 
-Two contracts hold the design together:
+Two contracts hold this together: a shared logical schema every system answers
+queries against, and a shared `VectorDBAdapter` API every system implements. How a
+system physically stores the data is left to its adapter. A system with native
+joins can keep the schema normalized; one without joins can denormalize into a
+single collection. That mapping is part of what FRAME compares, so it belongs in
+the adapter rather than in the harness.
 
-- a shared **logical schema** every system must be able to answer queries against, and
-- a shared **API** (`VectorDBAdapter`) every system implements.
+### The four conditions
 
-How a system *physically* stores the data is up to its adapter — a system with
-native joins can keep the schema normalized; one without can denormalize into a
-single collection. That mapping lives in the adapter, on purpose, because it is
-part of what the benchmark compares.
+Every query runs a 2×2 matrix: `{raw query text, semantic-only text} ×
+{filter, no filter}`. This separates two effects. The filter/no-filter axis shows
+what pushing an attribute into a filter costs or buys; the text axis shows what
+isolating the semantic remainder does. Each cell is scored against its own exact
+oracle answer. Queries with no predicate only run the two no-filter cells.
+Cross-condition aggregates are computed over the items scorable in every
+condition, so the numbers compare the same set of queries rather than reading a
+difference in coverage as a condition effect.
 
-## Quickstart
+Some fairness invariants are baked in so systems are measured the same way: one
+shared embedding encoder, and one set of extraction thresholds pinned at ingest
+(scene probability 0.10, object confidence 0.30) so every system searches the same
+filtered universe. The conditions are defined once in `frame/core/schema.py`.
 
-Requires [uv](https://docs.astral.sh/uv/).
+## Building the dataset
+
+Adapters ingest a backend-neutral **canonical dataset** rather than raw video:
+per-shard parquet tables plus a `keyframes_embeddings.h5`, under
+`data/canonical/<shard>/`. Each keyframe carries one 768-dim SigLIP embedding; the
+filterable metadata comes from content-extraction passes (Places365 scene labels,
+OWLv2 object detections, EasyOCR text). The query set targets V3C1
+(~1.08M keyframes), but the retrieval corpus is the union of all three V3C shards
+(~4.14M keyframes), so every query is scored against the full distractor pool.
+There are two ways to produce the canonical form.
+
+V3C1 already lives in a Postgres instance, so it is dumped directly:
 
 ```bash
-uv sync                                    # core harness only
-uv sync --extra pgvector --extra encode    # to run against pgvector
-uv sync --extra chroma   --extra encode    # to run against Chroma
-
-# 1. compile the authored query set -> data/benchmark.jsonl
-uv run python queryset/build.py
-
-# 2. enrich it with exact ground truth (needs the V3C DB + a GPU; see oracle/)
-sbatch build_gt.sh --scene-threshold 0.10 --object-threshold 0.30
-
-# 3. run a system and score it
-uv run python run_benchmark.py --system pgvector
+sbatch export_v3c.sh
 ```
 
-Optional dependency groups keep the heavy toolchains out of a light install:
-`pgvector` (DB driver), `encode` (embedding model), `oracle` (everything the
-ground-truth build needs), `viz` (plots).
+V3C2 and V3C3 are only available as extracted keyframe shards, so the model
+passes run over the files. The four passes are independent and resumable per
+video, so they run in parallel:
 
-## Adding your own system
+```bash
+sbatch scripts/prep_metadata.sh    # CPU:  videos / shots / keyframes parquet
+sbatch scripts/prep_embed.sh       # GPU:  SigLIP embeddings
+sbatch scripts/prep_detect.sh      # GPU:  OWLv2 object detections
+sbatch scripts/prep_scenes.sh      # GPU:  Places365 scene labels
+sbatch scripts/prep_ocr.sh         # GPU:  EasyOCR in-frame text
+# once metadata and the four passes finish:
+sbatch scripts/prep_consolidate.sh # CPU:  merge staging into canonical files
+```
+
+Pass a shard root and name to target another shard, e.g.
+`sbatch scripts/prep_embed.sh ~/datasets/V3C/V3C3 v3c3`. The pass conventions
+(id format, thresholds, vocab, weights) match the validated V3C1 set so shards
+stay comparable; they live in `frame/prep/common.py`. See `scripts/README.md` for
+the details, including the `NUM_SHARDS` pinning that keeps a resubmitted array job
+from re-mapping videos.
+
+## Adding a system
 
 Implement three methods on `VectorDBAdapter` (`frame/core/adapter.py`):
 
@@ -84,28 +166,26 @@ class MyAdapter(VectorDBAdapter):
     name = "mysystem"
 
     def load_data(self, dataset: Dataset) -> None:
-        # ONE-TIME ingest. Materialize the shared logical schema (a Tier-2
-        # canonical shard: parquet tables + an embeddings h5) into your system's
-        # own physical layout, then build the vector index. Must be idempotent.
+        # One-time ingest. Read the canonical dataset (parquet + embeddings h5),
+        # map it into your system's own layout, and build the vector index.
+        # Must be idempotent.
         ...
 
     def setup(self) -> None:
-        # PER-RUN. Connect, verify the index exists, apply search-time knobs.
-        # Do NOT ingest here — raise if the data is missing.
+        # Per run. Connect, check the index is there, apply search-time settings.
+        # Do not ingest here; raise if the data is missing.
         ...
 
     def search(self, query_vector, filters, k) -> list[str]:
-        # translate `filters` (AND-ed abstract predicates; empty == no filter)
-        # into your native query, run filtered k-NN, return k ids ranked best-first.
+        # Translate `filters` (AND-ed predicates; empty means no filter) into your
+        # native query, run filtered k-NN, and return k ids best-first.
         ...
 ```
 
-`load_data()` is where the multi-table workaround lives: pgvector loads the
-normalized tables and JOINs; a system without joins must denormalize the same
-neutral files into one flat collection. Keeping it separate from `setup()` means
-a benchmark run never pays (or hides) a multi-million-row ingest.
-
-Ingest once, then run:
+`load_data()` is where a multi-table workaround lives. pgvector loads the
+normalized tables and joins; a system without joins denormalizes the same files
+into one collection. Keeping it separate from `setup()` means a benchmark run
+never pays for, or hides, a multi-million-row ingest.
 
 ```bash
 sbatch load_dataset.sh --dataset data/canonical/v3c1   # one-time, per system
@@ -113,107 +193,78 @@ sbatch load_dataset.sh --check                         # verify your load_data()
 sbatch run_benchmark.sh --system mysystem              # per run
 ```
 
-Register it in `run_benchmark.py` + `scripts/load_dataset.py` and run. The shared `Runner` (drives the queries,
-all four conditions, timings) and `Analyzer` (scores against the oracle ground truth)
-are reused unchanged, so every system is measured the same way.
+Register the adapter in `run_benchmark.py` and `scripts/load_dataset.py`. The
+shared `Runner` and `Analyzer` are reused unchanged, so every system runs the
+same queries and is scored the same way.
 
 ## Repository layout
 
 ```
 frame/                     harness package
-  core/    schema · dataset (Tier-2 handle) · adapter (ABC) · runner · analyzer · encode
-  adapters/  pgvector (normalized, JOINs) · chroma (denormalized, one collection)
+  core/    schema · dataset · adapter (ABC) · runner · analyzer · encode · sweep
+  adapters/  pgvector (normalized, joins) · chroma (denormalized, one collection)
+  prep/    shared building blocks for the V3C model passes
 queryset/                  authored query set (source of truth) + build.py
   queries/*.json
 oracle/                    build_gt.py — exact ground-truth computation
-scripts/                   one-off analysis probes (profile_queryset, author_probe) + SLURM wrappers
-tests/                     unit tests for the harness core (run with `uv run pytest`)
+scripts/                   prep pipeline, analysis probes, plots, SLURM wrappers
+tests/                     unit tests for the harness core
 data/                      generated artifacts (gitignored)
-logs/                      SLURM job output *.out (gitignored)
-build_gt.sh                batch job for the oracle
-run_benchmark.py / .sh     run + score a system end-to-end
+logs/                      SLURM job output (gitignored)
+build_gt.sh                oracle batch job
+run_benchmark.py / .sh     run and score a system end-to-end
 ```
 
-All SLURM wrappers write their `.out` to `logs/` and are submitted from the repo
-root (e.g. `sbatch build_gt.sh …`, `sbatch scripts/author_probe.sh …`).
+`scripts/` holds three kinds of thing: the `prep_*` data pipeline, one-off
+diagnostic probes (query-set profiling, per-label selectivity), and the `plot_*`
+figure scripts. The plots need only JSON and matplotlib, so they run locally
+after pulling the artifacts. See `scripts/README.md`.
 
-## Design notes
+## Versioning
 
-- **Query set is the source of truth.** `queryset/queries/*.json` are authored by
-  hand; `queryset/build.py` compiles and validates them into `data/benchmark.jsonl`.
-  Ground truth is filled in place by the oracle — it lives in each item's `computed`
-  block, so there is a single artifact rather than a separate ground-truth file.
-- **Fairness.** All systems share one embedding encoder and one set of filter
-  thresholds, so every system searches the same query vectors over the same filtered
-  universe; only the retrieval/filtering under test varies.
-- **One deep run.** Each query retrieves a large `k` once; the analyzer derives
-  Recall@k at smaller cutoffs from that single ranked list.
-- **The 2×2 condition matrix.** Every query runs four cells — `{raw_query_text,
-  vector_query} × {predicate, no predicate}` — so the two deltas are separable: what
-  pushing an attribute into a filter costs or buys, and what isolating the semantic
-  remainder does. Each cell is scored against **its own** exact oracle answer. Items
-  with no predicate run only the two no-filter cells (the filter cells would be the
-  same search). Conditions are defined once in `frame/core/schema.py:CONDITIONS`.
-- **Aggregates use one common subset.** Cross-condition numbers cover only items
-  scorable in *every* condition, because the no-filter cells are scorable for items
-  the filter cells are not — averaging each over its own subset would compare
-  different query sets and read the difference as a condition effect.
-- Adapters return **ranked ids only** — sufficient for Recall@k and MRR.
-- **Every run records what it was measured against.** Two markers travel in each
-  results file: the **benchmark version** (`v3c1/1.0.0+d9ac09a6e5c6` — the query set
-  *and* its ground truth, which live in one file) and the **harness contract** (what
-  a results file means). The Analyzer **refuses** to score results that were not
-  produced against the current query set and harness; `--allow-mismatch` overrides.
-  See `frame/core/version.py`.
-
-## Query-set versioning
-
-`queryset/queryset.json` holds the hand-set semver; bump it when you change the
-query set:
+`queryset/queryset.json` holds a hand-set semver, bumped when the query set
+changes:
 
 | bump | when | effect on existing results |
 |---|---|---|
-| MAJOR | a query's meaning changed, items removed, or GT recomputed under different parameters | void |
-| MINOR | items added, nothing else | still valid — scoring restricts to the shared items |
-| PATCH | nothing result-affecting (notes, `status`, `verified` flags) | unaffected |
+| MAJOR | a query's meaning changed, items removed, or ground truth recomputed under different parameters | void |
+| MINOR | items added, nothing else | still valid; scoring restricts to the shared items |
+| PATCH | nothing result-affecting (notes, status, flags) | unaffected |
 
-`queryset/build.py` also computes a **digest** of the result-affecting contents and
-warns if they changed while the semver did not — a hand-set version gets forgotten
-eventually, so the digest is what is actually enforced. Provenance fields (`notes`,
-`source`, `status`, a filter's `vocab`/`verified`) are deliberately outside the
-digest: fixing a typo in a note must not invalidate a finished run.
+`queryset/build.py` also digests the result-affecting contents and warns if they
+changed while the semver did not, since a hand-set version eventually gets
+forgotten. Provenance fields (notes, source, status, a filter's vocab or verified
+flags) sit outside the digest, so fixing a typo does not invalidate a finished
+run. Because the digest separates the authored half from the ground-truth half, a
+rebuild carries ground truth forward for every query that did not change and drops
+it only for those that did.
 
-Because the digest separates the authored half from the ground-truth half, a
-rebuild **carries GT forward** for every query that did not change, and drops it
-only for those that did (re-run `oracle/build_gt.py` for those).
-
-```bash
-uv run python queryset/build.py            # -> v3c1/1.0.0+d9ac09a6e5c6
-sbatch build_gt.sh                          # fills GT, records its parameters
-uv run python run_benchmark.py --system pgvector
-```
+Each results file records what it was measured against: the benchmark version
+(the query set and its ground truth, e.g. `v3c1/1.0.0+d9ac09a6e5c6`) and the
+harness contract. The Analyzer refuses to score a mismatch unless you pass
+`--allow-mismatch`. See `frame/core/version.py`.
 
 ## Tests
 
-The pure-logic core (schema, analyzer, runner, profiler, adapter contract, caching
-encoder, and the query-set validator) is covered by a fast unit suite:
-
 ```bash
-uv sync            # core harness + pytest (dev group); no heavy extras needed
+uv sync
 uv run pytest
 ```
 
-The suite needs no live database, GPU, or model download — the DB adapter
-(`pgvector` → Postgres), the real `SiglipEncoder` (torch), and the oracle GT build
-(HPC/GPU) are integration concerns and are out of scope here. CI runs the same
-command on every push to `main` and every PR (`.github/workflows/tests.yml`).
+The unit suite covers the pure-logic core: schema, analyzer, runner, profiler,
+the adapter contract, the caching encoder, and the query-set validator. It needs
+no live database, GPU, or model download; the real adapters, the torch encoder,
+and the oracle build are integration concerns and are out of scope. CI runs the
+same command on every push and PR to `main` (`.github/workflows/tests.yml`).
 
-## Status
+## About
 
-Early. The shared harness and a pgvector adapter are in place; the query set and
-ground-truth pipeline run against V3C. Additional systems and a larger query set
-are in progress.
+FRAME was built for a master's thesis on filtered-ANN search in vector databases,
+using real Video Browser Showdown workloads to study how systems handle complex
+filtered queries. The query set is a single-annotator draft of around 40 KIS tasks
+derived from VBS logs (scene, object, and unfiltered workloads), and a query set
+spanning V3C2/V3C3 targets is future work, so expect rough edges.
 
 ## License
 
-TBD.
+MIT. See [LICENSE](LICENSE).
