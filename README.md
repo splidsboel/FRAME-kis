@@ -75,26 +75,24 @@ A run has an offline half that computes what the correct answer *is*, and an
 online half that asks each system the same questions through a real index. They
 meet at scoring.
 
-```
-OFFLINE / ORACLE (system-agnostic, exact)      ONLINE / SYSTEM UNDER TEST
-queryset/queries/*.json                        data/benchmark.jsonl
-   │ queryset/build.py                             │
-   ▼                                               ▼   adapter.setup()      (per run)
-data/benchmark.jsonl ──┐                     Runner(adapter, encoder).run()
-   │ oracle/build_gt.py │                          │   adapter.search(vec, filters, k)
-   ▼ (exact kNN; ground │                          ▼
-     truth written into │                     data/raw_results.<sys>.jsonl
-     each item's block)  │                         │
-   └──────────┬─────────┘                          │
-              ▼                                     │
-        Analyzer().analyze(raw, items)  ◄──────────┘
-              ▼
-        data/metrics.<sys>.jsonl   (Recall@k, MRR, filtered-vs-unfiltered Δ)
-```
+The **offline half** is the oracle, and it is system-agnostic. `queryset/build.py`
+compiles the authored `queryset/queries/*.json` into `data/benchmark.jsonl`, and
+`oracle/build_gt.py` then does exact k-NN over the corpus and writes the ground
+truth back into each item's own block. Because this search is exact and independent
+of any system under test, its answer is the reference every system is measured
+against.
 
-The oracle does exact search, independent of any system, so its answer is the
-reference. Each adapter answers the same queries through its own index and filter
-translation. The gap between the two is what the benchmark reports.
+The **online half** is the system under test. `Runner(adapter, encoder).run()`
+reads the same `data/benchmark.jsonl`, calls the adapter's `setup()` once per run,
+and for every query calls `adapter.search(vec, filters, k)` through the system's
+real index and filter translation, writing the ranked ids to
+`data/raw_results.<sys>.jsonl`.
+
+The two halves **meet at scoring**: `Analyzer().analyze(raw, items)` reads the raw
+results and the oracle's ground truth together and emits
+`data/metrics.<sys>.jsonl` (Recall@k, MRR, and the filtered-vs-unfiltered Δ). The
+gap between the exact reference and what each system's index actually returned is
+what the benchmark reports.
 
 Two contracts hold this together: a shared logical schema every system answers
 queries against, and a shared `VectorDBAdapter` API every system implements. How a
